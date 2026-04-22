@@ -156,13 +156,9 @@ function Navbar() {
   ]
 
   const handleLogout = () => {
-  useAppStore.getState().setCurrentUser(null)
-  useAppStore.getState().setActiveSession(null)
   useAppStore.getState().resetApp()
-
-  setTimeout(() => {
-    useAppStore.getState().setCurrentView('login')
-  }, 0)
+  setCurrentView('login')
+  window.location.href = '/'   // force reset route state
 }
 
   const initials = currentUser?.name
@@ -677,35 +673,10 @@ function AccessibilityManager() {
 export function AppShell() {
   const currentView = useAppStore((s) => s.currentView)
   const currentUser = useAppStore((s) => s.currentUser)
-  const setCurrentView = useAppStore((s) => s.setCurrentView)
-
-  const hydrated = useAppStore.persist.hasHydrated?.() ?? true
-
-    useEffect(() => {
-      if (!hydrated) return
-
-      if (currentUser) {
-        setCurrentView('dashboard')
-      } else {
-        setCurrentView('landing')
-      }
-    }, [currentUser, hydrated])
 
   const isAuthView = AUTH_VIEWS.includes(currentView)
   const showNavbar = !isAuthView && currentUser !== null
   const CurrentViewComponent = VIEW_MAP[currentView]
-
-  useEffect(() => {
-  const stored = localStorage.getItem('silent-speak-storage')
-
-  if (!stored) return
-
-    const parsed = JSON.parse(stored)
-
-    if (parsed?.state?.currentUser) {
-      setCurrentUser(parsed.state.currentUser)
-    }
-  }, [])
 
   return (
     <div className="min-h-screen flex flex-col">
