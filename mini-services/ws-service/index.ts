@@ -66,9 +66,11 @@ io.on("connection", (socket) => {
       });
 
       // Send existing captions to student
+      socket.join(data.sessionCode);
+
       setTimeout(() => {
         socket.emit("caption-history", session.captions);
-      }, 300);
+      }, 200);
 
       console.log(
         `Student ${data.nickname} joined session ${data.sessionCode}`
@@ -77,24 +79,20 @@ io.on("connection", (socket) => {
   );
 
   // Teacher sends live caption
-  socket.on(
-    "caption",
-    (data: { sessionCode: string; text: string; timestamp: number }) => {
-      const session = sessions.get(data.sessionCode);
-      if (!session) return;
+ socket.on("caption", (data) => {
+  const session = sessions.get(data.sessionCode);
+  if (!session) return;
 
-      session.captions.push({
-        text: data.text,
-        timestamp: data.timestamp,
-      });
+  session.captions.push({
+    text: data.text,
+    timestamp: data.timestamp,
+  });
 
-      // FIX: broadcast to entire room INCLUDING all clients reliably
-      io.in(data.sessionCode).emit("caption", {
-        text: data.text,
-        timestamp: data.timestamp,
-      });
-    }
-  );
+  io.to(data.sessionCode).emit("caption", {
+    text: data.text,
+    timestamp: data.timestamp,
+  });
+});
 
   // Teacher sends bulk captions (for full caption updates)
   socket.on(
@@ -107,25 +105,19 @@ io.on("connection", (socket) => {
   );
 
   // Send message (teacher to students or student to teacher)
-  socket.on("message", (data) => {
+  socket.on("caption", (data) => {
   const session = sessions.get(data.sessionCode);
   if (!session) return;
 
-  // Direct message
-  if (data.recipientId) {
-    if (data.senderRole === "teacher") {
-      const student = session.students.get(data.recipientId);
-      if (student) {
-        io.to(student.socketId).emit("message", data);
-      }
-    } else {
-      io.to(session.teacherSocketId).emit("message", data);
-    }
-    return;
-  }
+  session.captions.push({
+    text: data.text,
+    timestamp: data.timestamp,
+  });
 
-  // Broadcast message
-  io.to(data.sessionCode).emit("message", data);
+  io.to(data.sessionCode).emit("caption", {
+    text: data.text,
+    timestamp: data.timestamp,
+  });
 });
 
   // Quick communication (student sends quick phrase with TTS)
