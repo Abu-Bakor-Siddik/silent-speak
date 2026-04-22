@@ -30,7 +30,7 @@ export function RoleSelectPage() {
         return
       }
     }
-
+// 
     setLoading(true)
     try {
       const handleJoinSession = async () => {
