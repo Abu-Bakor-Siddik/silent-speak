@@ -10,8 +10,9 @@ export function RoleSelectPage() {
   const setCurrentView = useAppStore((s) => s.setCurrentView)
   const currentUser = useAppStore((s) => s.currentUser)
   const setActiveSession = useAppStore((s) => s.setActiveSession)
-  const hasActiveSession = useAppStore((s) => s.hasActiveSession)
+
   const activeSession = useAppStore((s) => s.activeSession)
+  const hasActiveSession = !!activeSession
   const clearCaptions = useAppStore((s) => s.clearCaptions)
   const clearMessages = useAppStore((s) => s.clearMessages)
 

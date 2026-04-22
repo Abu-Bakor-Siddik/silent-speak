@@ -135,8 +135,6 @@ interface AppState {
   removeParticipant: (studentId: string) => void
 
   // Quick navigation for active session
-  hasActiveSession: boolean
-  setHasActiveSession: (v: boolean) => void
 }
 
 // ─── Default Settings ────────────────────────────────────────────────────────
@@ -181,7 +179,6 @@ export const useAppStore = create<AppState>()(
   setActiveSession: (session) =>
     set({
       activeSession: session,
-      hasActiveSession: session !== null,
     }),
 
     resetApp: () => {
@@ -193,7 +190,6 @@ export const useAppStore = create<AppState>()(
         participants: [],
         tasks: [],
         fullCaptionText: '',
-        hasActiveSession: false,
       })
 
       localStorage.removeItem('silent-speak-storage')
@@ -251,9 +247,7 @@ export const useAppStore = create<AppState>()(
     })),
 
   // Quick navigation for active session
-  hasActiveSession: false,
-    setHasActiveSession: (v) => set({ hasActiveSession: v }),
-    }),
+  
 {
   name: 'silent-speak-storage',
 }
