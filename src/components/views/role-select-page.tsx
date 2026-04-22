@@ -21,87 +21,46 @@ export function RoleSelectPage() {
   const [conflictMsg, setConflictMsg] = useState('')
 
   const handleCreateSession = async () => {
-    if (!currentUser) return
-    setConflictMsg('')
+  if (!currentUser) return
+  setConflictMsg('')
 
-    if (hasActiveSession && activeSession) {
-      if (activeSession.role === 'student') {
-        setConflictMsg('You have an active session as a student. Leave that session first to create a new session as a teacher.')
-        return
-      }
+  setLoading(true)
+
+  try {
+    const res = await fetch('/api/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        teacherId: currentUser.id,
+        teacherName:
+          currentUser.name || currentUser.nickname || currentUser.email,
+      }),
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      setConflictMsg(data.error || 'Failed to create session')
+      return
     }
-// 
-    setLoading(true)
-    try {
-      const handleJoinSession = async () => {
-    if (!currentUser || !sessionCode.trim()) return
-    setConflictMsg('')
-    setLoading(true)
 
-    try {
-      // 1. Get all sessions
-      const res = await fetch(`/api/sessions?userId=${currentUser.id}`)
-      const data = await res.json()
+    clearCaptions()
+    clearMessages()
 
-      const sessions = data.sessions || []
+    setActiveSession({
+      code: data.session.code,
+      role: 'teacher',
+      teacherName:
+        currentUser.name || currentUser.nickname || currentUser.email,
+    })
 
-      // 2. Find matching session code
-      const matchedSession = sessions.find(
-        (s: any) => s.code === sessionCode.trim().toUpperCase()
-      )
-
-      // 3. ❌ INVALID CODE CHECK
-      if (!matchedSession) {
-        setConflictMsg('❌ Wrong session code. Please enter correct one.')
-        setLoading(false)
-        return
-      }
-
-      // 4. OPTIONAL: register student into session
-      await fetch('/api/sessions', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionCode: matchedSession.code,
-          studentId: currentUser.id,
-          nickname:
-            currentUser.nickname || currentUser.name || currentUser.email,
-        }),
-      })
-
-      // 5. SUCCESS → JOIN SESSION
-      clearCaptions()
-      clearMessages()
-
-      setActiveSession({
-        code: matchedSession.code,
-        role: 'student',
-        teacherName: matchedSession.teacherName || 'Teacher',
-      })
-
-      setCurrentView('student-session')
-    } catch (err) {
-      setConflictMsg('Server error. Try again.')
-    } finally {
-      setLoading(false)
-    }
+    setCurrentView('teacher-session')
+  } catch (err) {
+    setConflictMsg('Server error while creating session')
+  } finally {
+    setLoading(false)
   }
-        if (res.ok) {
-          clearCaptions()
-          clearMessages()
-          setActiveSession({
-            code: data.session.code,
-            role: 'teacher',
-            teacherName: currentUser.name || currentUser.nickname || currentUser.email,
-          })
-          setCurrentView('teacher-session')
-        }
-      } catch {
-        // handle error
-      } finally {
-        setLoading(false)
-      }
-    }
+}
 
   const handleJoinSession = async () => {
     if (!currentUser || !sessionCode.trim()) return
