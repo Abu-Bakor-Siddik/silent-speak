@@ -680,10 +680,12 @@ export function AppShell() {
   const setCurrentView = useAppStore((s) => s.setCurrentView)
 
   useEffect(() => {
-    if (!currentUser && currentView !== 'login') {
-      setCurrentView('landing')
-    }
-  }, [currentUser])
+  if (currentUser) {
+    setCurrentView('dashboard')
+  } else {
+    setCurrentView('landing')
+  }
+}, [currentUser])
 
   const isAuthView = AUTH_VIEWS.includes(currentView)
   const showNavbar = !isAuthView && currentUser !== null
