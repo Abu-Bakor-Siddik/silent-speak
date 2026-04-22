@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid()) @db.VarChar(30)
+  email          String   @unique @db.VarChar(255)
+  password       String   @db.VarChar(255)
+  name           String?  @db.VarChar(255)
+  nickname       String?  @db.VarChar(100)
+  avatar         String?  @db.Text
+  disability     String?  @default("none") @db.VarChar(50)
+  semester       String?  @db.VarChar(50)
+  department     String?  @db.VarChar(100)
+  fontSize       String   @default("medium") @db.VarChar(20)
+  fontFamily     String   @default("default") @db.VarChar(20)
+  theme          String   @default("light") @db.VarChar(20)
+  buttonSize     String   @default("default") @db.VarChar(20)
+  colorBlindMode String   @default("none") @db.VarChar(20)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  sessionsAsTeacher SessionParticipant[]
+  notes             Note[]
+  tasks             Task[]
+  messagesSent      Message[]
+}
+
+model Session {
+  id          String    @id @default(cuid()) @db.VarChar(30)
+  code        String    @unique @db.VarChar(10)
+  teacherId   String    @db.VarChar(30)
+  teacherName String    @db.VarChar(255)
+  status      String    @default("active") @db.VarChar(20)
+  rawCaption  String    @default("") @db.Text
+  createdAt   DateTime  @default(now())
+  endedAt     DateTime?
+
+  participants SessionParticipant[]
+  messages     Message[]
+  tasks        Task[]
+}
+
+model SessionParticipant {
+  id         String   @id @default(cuid()) @db.VarChar(30)
+  sessionId  String   @db.VarChar(30)
+  studentId  String   @db.VarChar(30)
+  nickname   String   @db.VarChar(100)
+  joinedAt   DateTime @default(now())
+
+  session    Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student    User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, studentId])
+}
+
+model Note {
+  id         String   @id @default(cuid()) @db.VarChar(30)
+  userId     String   @db.VarChar(30)
+  title      String   @db.VarChar(255)
+  content    String   
+  rawContent String?  
+  type       String   @default("session") @db.VarChar(20)
+  sessionId  String?  @db.VarChar(30)
+  duration   String?  @db.VarChar(50)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Task {
+  id          String    @id @default(cuid()) @db.VarChar(30)
+  sessionId   String    @db.VarChar(30)
+  teacherId   String    @db.VarChar(30)
+  title       String    @db.VarChar(255)
+  description String?   @db.Text
+  type        String    @default("task") @db.VarChar(20)
+  dueDate     DateTime?
+  status      String    @default("pending") @db.VarChar(20)
+  createdAt   DateTime  @default(now())
+
+  session     Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  teacher     User      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+}
+
+model Message {
+  id          String   @id @default(cuid()) @db.VarChar(30)
+  sessionId   String   @db.VarChar(30)
+  senderId    String   @db.VarChar(30)
+  senderName  String   @db.VarChar(255)
+  senderRole  String   @db.VarChar(20)
+  content     String   @db.Text
+  recipientId String?  @db.VarChar(30)
+  type        String   @default("text") @db.VarChar(20)
+  createdAt   DateTime @default(now())
+
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sender      User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+}

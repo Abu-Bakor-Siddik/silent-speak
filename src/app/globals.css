@@ -1,0 +1,575 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ─── Light theme (default) ──────────────────────────────────────────────── */
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+/* ─── Dark theme ─────────────────────────────────────────────────────────── */
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* ─── High Contrast Mode ─────────────────────────────────────────────────── */
+.high-contrast {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0 0 0);
+  --primary: oklch(0 0 0);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.95 0 0);
+  --secondary-foreground: oklch(0 0 0);
+  --muted: oklch(0.93 0 0);
+  --muted-foreground: oklch(0.2 0 0);
+  --accent: oklch(0.85 0 0);
+  --accent-foreground: oklch(0 0 0);
+  --destructive: oklch(0.45 0.25 25);
+  --border: oklch(0 0 0);
+  --input: oklch(0 0 0);
+  --ring: oklch(0 0 0);
+}
+
+.high-contrast.dark {
+  --background: oklch(0 0 0);
+  --foreground: oklch(1 0 0);
+  --card: oklch(0.05 0 0);
+  --card-foreground: oklch(1 0 0);
+  --popover: oklch(0.05 0 0);
+  --popover-foreground: oklch(1 0 0);
+  --primary: oklch(1 0 0);
+  --primary-foreground: oklch(0 0 0);
+  --secondary: oklch(0.15 0 0);
+  --secondary-foreground: oklch(1 0 0);
+  --muted: oklch(0.15 0 0);
+  --muted-foreground: oklch(0.85 0 0);
+  --accent: oklch(0.2 0 0);
+  --accent-foreground: oklch(1 0 0);
+  --destructive: oklch(0.7 0.2 25);
+  --border: oklch(1 0 0);
+  --input: oklch(1 0 0);
+  --ring: oklch(1 0 0);
+}
+
+.high-contrast * {
+  border-width: 2px !important;
+}
+
+.high-contrast button,
+.high-contrast a,
+.high-contrast [role="button"] {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.high-contrast button:focus-visible,
+.high-contrast a:focus-visible,
+.high-contrast [role="button"]:focus-visible {
+  outline: 3px solid oklch(0 0 0) !important;
+  outline-offset: 2px !important;
+}
+
+/* ─── Color Blind Modes ──────────────────────────────────────────────────── */
+
+/* Protanopia (red-blind) — shift reds to yellows/oranges, increase blue contrast */
+.color-blind.protanopia,
+.protanopia {
+  --primary: oklch(0.45 0.15 250);
+  --primary-foreground: oklch(0.98 0 0);
+  --destructive: oklch(0.65 0.2 85);
+  --chart-1: oklch(0.7 0.15 85);
+  --chart-2: oklch(0.6 0.12 200);
+  --chart-3: oklch(0.5 0.08 260);
+  --chart-4: oklch(0.75 0.15 50);
+  --chart-5: oklch(0.65 0.12 170);
+  --accent: oklch(0.85 0.1 85);
+  --accent-foreground: oklch(0.2 0.05 85);
+  --ring: oklch(0.55 0.15 250);
+}
+
+/* Deuteranopia (green-blind) — shift greens to yellows/browns, increase blue/orange contrast */
+.color-blind.deuteranopia,
+.deuteranopia {
+  --primary: oklch(0.5 0.18 280);
+  --primary-foreground: oklch(0.98 0 0);
+  --destructive: oklch(0.65 0.22 30);
+  --chart-1: oklch(0.7 0.15 60);
+  --chart-2: oklch(0.6 0.1 40);
+  --chart-3: oklch(0.5 0.08 260);
+  --chart-4: oklch(0.75 0.18 85);
+  --chart-5: oklch(0.65 0.12 50);
+  --accent: oklch(0.85 0.12 40);
+  --accent-foreground: oklch(0.2 0.05 40);
+  --ring: oklch(0.55 0.15 280);
+}
+
+/* Tritanopia (blue-blind) — shift blues to greens/pinks, increase red/green contrast */
+.color-blind.tritanopia,
+.tritanopia {
+  --primary: oklch(0.5 0.2 25);
+  --primary-foreground: oklch(0.98 0 0);
+  --destructive: oklch(0.6 0.2 20);
+  --chart-1: oklch(0.7 0.15 30);
+  --chart-2: oklch(0.6 0.12 140);
+  --chart-3: oklch(0.5 0.1 60);
+  --chart-4: oklch(0.75 0.15 350);
+  --chart-5: oklch(0.65 0.12 25);
+  --accent: oklch(0.85 0.1 30);
+  --accent-foreground: oklch(0.2 0.05 30);
+  --ring: oklch(0.55 0.2 25);
+}
+
+/* Add patterns and icons for better distinction in color-blind mode */
+.protanopia [data-chart-bar],
+.deuteranopia [data-chart-bar],
+.tritanopia [data-chart-bar] {
+  stroke-width: 2;
+  stroke: var(--foreground);
+}
+
+/* ─── Font Size Classes ──────────────────────────────────────────────────── */
+.font-small {
+  font-size: 14px;
+}
+
+.font-medium {
+  font-size: 16px;
+}
+
+.font-large {
+  font-size: 18px;
+}
+
+.font-xlarge {
+  font-size: 22px;
+}
+
+/* ─── Font Family Classes ────────────────────────────────────────────────── */
+.font-default {
+  --font-geist-sans: 'Geist', 'Lexend', system-ui, sans-serif;
+}
+
+.font-dyslexia {
+  --font-geist-sans: 'Lexend', 'OpenDyslexic', 'Comic Sans MS', sans-serif;
+  letter-spacing: 0.02em;
+  word-spacing: 0.1em;
+  line-height: 1.6;
+}
+
+.font-dyslexia p,
+.font-dyslexia span,
+.font-dyslexia li,
+.font-dyslexia td,
+.font-dyslexia th,
+.font-dyslexia label,
+.font-dyslexia button,
+.font-dyslexia input,
+.font-dyslexia textarea,
+.font-dyslexia select {
+  letter-spacing: 0.02em;
+  word-spacing: 0.1em;
+  line-height: 1.6;
+}
+
+.font-mono {
+  --font-geist-sans: var(--font-geist-mono), 'Courier New', monospace;
+}
+
+/* ─── Button Size Classes ────────────────────────────────────────────────── */
+.btn-default {
+  --btn-scale: 1;
+}
+
+.btn-large {
+  --btn-scale: 1.15;
+}
+
+.btn-xlarge {
+  --btn-scale: 1.35;
+}
+
+.btn-large button,
+.btn-large [role="button"] {
+  min-height: 44px;
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+  font-size: 1rem;
+}
+
+.btn-xlarge button,
+.btn-xlarge [role="button"] {
+  min-height: 52px;
+  padding-top: 0.875rem;
+  padding-bottom: 0.875rem;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  font-size: 1.125rem;
+}
+
+/* ─── Custom Scrollbar (Accessibility-friendly) ──────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted-foreground) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--muted-foreground);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--foreground);
+}
+
+.high-contrast *::-webkit-scrollbar-thumb {
+  background-color: var(--foreground);
+  border: 1px solid var(--foreground);
+}
+
+/* ─── Mobile-first Responsive Overrides ──────────────────────────────────── */
+@media (max-width: 640px) {
+  /* Ensure touch targets are at least 44px on mobile */
+  button,
+  a[role="button"],
+  [role="button"],
+  input[type="checkbox"],
+  input[type="radio"],
+  select {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Reduce side padding on mobile */
+  .card {
+    padding: 0.875rem;
+  }
+
+  /* Ensure text is readable on small screens */
+  body {
+    -webkit-text-size-adjust: 100%;
+  }
+}
+
+/* ─── Focus styles for accessibility ─────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.high-contrast :focus-visible {
+  outline: 3px solid var(--foreground);
+  outline-offset: 2px;
+}
+
+/* Skip to content link for keyboard navigation */
+.sr-only-focusable:focus,
+.sr-only:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0.5rem 1rem;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  z-index: 9999;
+}
+
+/* ─── Reduced motion ─────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ─── Line Height Classes ────────────────────────────────────────────────── */
+.lh-normal {
+  line-height: 1.5;
+}
+
+.lh-relaxed {
+  line-height: 1.75;
+}
+
+.lh-loose {
+  line-height: 2;
+}
+
+/* ─── Reduce Animations (user preference) ──────────────────────────────── */
+.reduce-animations *,
+.reduce-animations *::before,
+.reduce-animations *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* ─── UI Style: Futuristic ──────────────────────────────────────────────── */
+.ui-futuristic {
+  --radius: 0.875rem;
+}
+
+.ui-futuristic .card,
+.ui-futuristic [data-slot="card"] {
+  border-radius: 1rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid oklch(0.7 0.1 250 / 15%);
+  box-shadow: 0 4px 24px -4px oklch(0.5 0.15 250 / 8%);
+}
+
+.ui-futuristic button {
+  border-radius: 0.75rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ui-futuristic input,
+.ui-futuristic select,
+.ui-futuristic textarea {
+  border-radius: 0.75rem;
+}
+
+/* ─── Futuristic: Global Section Spacing ───────────────────────────────────── */
+.ui-futuristic main > div,
+.ui-futuristic .space-y-6,
+.ui-futuristic .space-y-4 {
+  gap: 1.75rem;
+}
+
+.ui-futuristic section {
+  margin-bottom: 1.5rem;
+}
+
+/* ─── Futuristic: Page View Enhancements ────────────────────────────────────── */
+.ui-futuristic .card:hover {
+  box-shadow: 0 8px 32px -8px oklch(0.5 0.15 250 / 12%);
+}
+
+.ui-futuristic h1 {
+  background: linear-gradient(135deg, oklch(0.3 0.1 250), oklch(0.5 0.15 280));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ui-futuristic.dark h1 {
+  background: linear-gradient(135deg, oklch(0.85 0.1 250), oklch(0.75 0.12 280));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ui-futuristic .card h1,
+.ui-futuristic [data-slot="card"] h1 {
+  background: none;
+  -webkit-background-clip: unset;
+  -webkit-text-fill-color: unset;
+  background-clip: unset;
+}
+
+/* Futuristic: Glass effect for cards */
+.ui-futuristic .card {
+  background: oklch(1 0 0 / 70%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.ui-futuristic.dark .card {
+  background: oklch(0.2 0 0 / 70%);
+  border-color: oklch(1 0 0 / 10%);
+}
+
+/* Futuristic: Gradient borders on focused inputs */
+.ui-futuristic input:focus,
+.ui-futuristic textarea:focus,
+.ui-futuristic select:focus {
+  border-image: linear-gradient(135deg, oklch(0.5 0.15 250), oklch(0.6 0.12 280)) 1;
+  box-shadow: 0 0 0 3px oklch(0.5 0.15 250 / 15%);
+}
+
+/* Futuristic: Animated gradient for primary buttons */
+.ui-futuristic button[class*="bg-primary"],
+.ui-futuristic button[class*="bg-destructive"] {
+  background-size: 200% 200%;
+  animation: futuristic-gradient-shift 3s ease infinite;
+}
+
+@keyframes futuristic-gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Futuristic: Section dividers with glow */
+.ui-futuristic .border-t,
+.ui-futuristic hr {
+  border-image: linear-gradient(90deg, transparent, oklch(0.5 0.1 250 / 30%), transparent) 1;
+}
+
+/* Futuristic: Badge glow */
+.ui-futuristic .badge,
+.ui-futuristic [data-slot="badge"] {
+  box-shadow: 0 0 8px oklch(0.5 0.15 250 / 10%);
+}
+
+/* Futuristic: Section spacing - prevent overlapping */
+.ui-futuristic main {
+  padding-top: 0.5rem;
+  padding-bottom: 1rem;
+}
+
+/* Futuristic: Landing page specific overrides */
+.ui-futuristic section[id="features"] {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+}
+
+/* ─── Print styles ───────────────────────────────────────────────────────── */
+@media print {
+  header,
+  footer,
+  .fixed {
+    display: none !important;
+  }
+
+  body {
+    font-size: 12pt;
+    color: #000;
+    background: #fff;
+  }
+}

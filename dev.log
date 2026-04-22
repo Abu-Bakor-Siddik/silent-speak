@@ -1,0 +1,129 @@
+▲ Next.js 16.2.4 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.107:3000
+- Environments: .env
+✓ Ready in 188ms
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+
+ GET / 200 in 1728ms (next.js: 1612ms, application-code: 116ms)
+Login error: Error [PrismaClientInitializationError]: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/abubakorsiddik/Downloads/SilentSpeak-Project/.next/dev/server/chunks/[root-of-the-server]__137kqi2._.js:91:154
+
+  88         status: 400
+  89     });
+  90 }
+→ 91 const user = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+Database `silentspeak` does not exist
+    at <unknown> (src/app/api/auth/login/route.ts:17:32)
+    at async POST (src/app/api/auth/login/route.ts:17:18)
+  15 |     }
+  16 |
+> 17 |     const user = await db.user.findUnique({
+     |                                ^
+  18 |       where: { email },
+  19 |     });
+  20 | {
+  clientVersion: '6.19.3',
+  errorCode: undefined,
+  retryable: undefined
+}
+ POST /api/auth/login 500 in 564ms (next.js: 177ms, application-code: 387ms)
+Signup error: Error [PrismaClientInitializationError]: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/abubakorsiddik/Downloads/SilentSpeak-Project/.next/dev/server/chunks/[root-of-the-server]__08fm8ge._.js:91:162
+
+  88         status: 400
+  89     });
+  90 }
+→ 91 const existingUser = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+Database `silentspeak` does not exist
+    at <unknown> (src/app/api/auth/signup/route.ts:17:40)
+    at async POST (src/app/api/auth/signup/route.ts:17:26)
+  15 |     }
+  16 |
+> 17 |     const existingUser = await db.user.findUnique({
+     |                                        ^
+  18 |       where: { email },
+  19 |     });
+  20 | {
+  clientVersion: '6.19.3',
+  errorCode: undefined,
+  retryable: undefined
+}
+ POST /api/auth/signup 500 in 150ms (next.js: 61ms, application-code: 90ms)
+Signup error: Error [PrismaClientInitializationError]: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/abubakorsiddik/Downloads/SilentSpeak-Project/.next/dev/server/chunks/[root-of-the-server]__08fm8ge._.js:91:162
+
+  88         status: 400
+  89     });
+  90 }
+→ 91 const existingUser = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+Database `silentspeak` does not exist
+    at <unknown> (src/app/api/auth/signup/route.ts:17:40)
+    at async POST (src/app/api/auth/signup/route.ts:17:26)
+  15 |     }
+  16 |
+> 17 |     const existingUser = await db.user.findUnique({
+     |                                        ^
+  18 |       where: { email },
+  19 |     });
+  20 | {
+  clientVersion: '6.19.3',
+  errorCode: undefined,
+  retryable: undefined
+}
+ POST /api/auth/signup 500 in 106ms (next.js: 7ms, application-code: 98ms)
+  Reload env: .env
+ GET / 200 in 63ms (next.js: 38ms, application-code: 26ms)
+  Reload env: .env
+ GET / 200 in 50ms (next.js: 37ms, application-code: 13ms)
+  Reload env: .env
+ GET / 200 in 51ms (next.js: 39ms, application-code: 12ms)
+  Reload env: .env
+ GET / 200 in 57ms (next.js: 40ms, application-code: 17ms)
+  Reload env: .env
+ GET / 200 in 44ms (next.js: 29ms, application-code: 15ms)
+SyntaxError: /Users/abubakorsiddik/Downloads/SilentSpeak-Project/package.json (directory description file): SyntaxError: /Users/abubakorsiddik/Downloads/SilentSpeak-Project/package.json (directory description file): SyntaxError: Expected ',' or '}' after property value in JSON at position 242 (line 10 column 5)
+    at JSON.parse (<anonymous>)
+    [2m[at Object.<anonymous> (/Users/abubakorsiddik/Downloads/SilentSpeak-Project/node_modules/enhanced-resolve/lib/CachedInputFileSystem.js:625:26)][0m
+    [2m[at CacheBackend.provideSync (/Users/abubakorsiddik/Downloads/SilentSpeak-Project/node_modules/enhanced-resolve/lib/CachedInputFileSystem.js:344:67)][0m
+    [2m[at SyncAsyncFileSystemDecorator.readJson (/Users/abubakorsiddik/Downloads/SilentSpeak-Project/node_modules/enhanced-resolve/lib/SyncAsyncFileSystemDecorator.js:197:29)][0m
+    [2m[at /Users/abubakorsiddik/Downloads/SilentSpeak-Project/node_modules/enhanced-resolve/lib/DescriptionFileUtils.js:104:26][0m
+    [2m[at next (/Users/abubakorsiddik/Downloads/SilentSpeak-Project/node_modules/enhanced-resolve/lib/forEachBail.js:35:3)][0m
+    [2m[at forEachBail (/Users/abubakorsiddik/Downloads/SilentSpeak-Project/node_modules/enhanced-resolve/lib/forEachBail.js:49:9)][0m
+    [2m[at findDescriptionFile (/Users/abubakorsiddik/Downloads/SilentSpeak-Project/node_modules/enhanced-resolve/lib/DescriptionFileUtils.js:70:3)][0m
+    [2m[at /Users/abubakorsiddik/Downloads/SilentSpeak-Project/node_modules/enhanced-resolve/lib/DescriptionFileUtils.js:167:12][0m
+    [2m[at /Users/abubakorsiddik/Downloads/SilentSpeak-Project/node_modules/enhanced-resolve/lib/forEachBail.js:39:13][0m
+✓ Compiled in 219ms
+  Reload env: .env
+✓ Compiled in 233ms
+✓ Compiled in 30ms
+✓ Compiled in 37ms
+✓ Compiled in 30ms
+✓ Compiled in 28ms
+✓ Compiled in 40ms
+✓ Compiled in 41ms
+✓ Compiled in 58ms
+✓ Compiled in 70ms
+✓ Compiled in 98ms
+✓ Compiled in 42ms
+✓ Compiled in 38ms
+✓ Compiled in 46ms
+✓ Compiled in 39ms
+✓ Compiled in 34ms
+Error: Turbopack build failed with 1 errors:
+./src/app
+Error: Next.js inferred your workspace root, but it may not be correct.
+    We couldn't find the Next.js package (next/package.json) from the project directory: /Users/abubakorsiddik/Downloads/SilentSpeak-Project/src/app
+     To fix this, set turbopack.root in your Next.js config, or ensure the Next.js package is resolvable from this directory.
+    Note: For security and performance reasons, files outside of the project directory will not be compiled.
+    See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+
+    at ignore-listed frames
+[?25h
