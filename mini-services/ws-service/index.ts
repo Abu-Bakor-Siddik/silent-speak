@@ -1,12 +1,19 @@
+import { createServer } from "http";
 import { Server } from "socket.io";
 
-const PORT = 3003;
+const PORT = Number(process.env.PORT) || 3003;
 
-const io = new Server(PORT, {
+const httpServer = createServer();
+
+const io = new Server(httpServer, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"],
   },
+});
+
+httpServer.listen(PORT, () => {
+  console.log(`WebSocket service running on port ${PORT}`);
 });
 
 // Session state
@@ -79,7 +86,7 @@ io.on("connection", (socket) => {
   );
 
   // Teacher sends live caption
- socket.on("caption", (data) => {
+socket.on("caption", (data) => {
   const session = sessions.get(data.sessionCode);
   if (!session) return;
 
@@ -105,19 +112,11 @@ io.on("connection", (socket) => {
   );
 
   // Send message (teacher to students or student to teacher)
-  socket.on("caption", (data) => {
+  socket.on("message", (data) => {
   const session = sessions.get(data.sessionCode);
   if (!session) return;
 
-  session.captions.push({
-    text: data.text,
-    timestamp: data.timestamp,
-  });
-
-  io.to(data.sessionCode).emit("caption", {
-    text: data.text,
-    timestamp: data.timestamp,
-  });
+  io.to(data.sessionCode).emit("message", data);
 });
 
   // Quick communication (student sends quick phrase with TTS)
