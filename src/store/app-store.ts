@@ -248,7 +248,8 @@ export const useAppStore = create<AppState>()(
 
   // Quick navigation for active session
   
-{
+  }),
+  {
   name: 'silent-speak-storage',
 }
 )
