@@ -165,7 +165,14 @@ export function RoleSelectPage() {
             <CardDescription>Create a new live session for your students</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={handleCreateSession} disabled={loading} className="w-full">
+            <Button
+              onClick={() => {
+                console.log("CLICKED");
+                handleCreateSession();
+              }}
+              disabled={loading}
+              className="w-full"
+            >
               {loading ? 'Creating...' : 'Create New Session'}
             </Button>
           </CardContent>
