@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       where: { studentId: userId },
       select: { sessionId: true },
     });
-
+ 
     const participantSessionIds = participantRecords.map((p) => p.sessionId);
 
     const sessionsAsParticipant = participantSessionIds.length > 0

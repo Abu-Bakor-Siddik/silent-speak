@@ -32,28 +32,75 @@ export function RoleSelectPage() {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teacherId: currentUser.id, teacherName: currentUser.name || currentUser.nickname || currentUser.email }),
-      })
+      const handleJoinSession = async () => {
+    if (!currentUser || !sessionCode.trim()) return
+    setConflictMsg('')
+    setLoading(true)
+
+    try {
+      // 1. Get all sessions
+      const res = await fetch(`/api/sessions?userId=${currentUser.id}`)
       const data = await res.json()
-      if (res.ok) {
-        clearCaptions()
-        clearMessages()
-        setActiveSession({
-          code: data.session.code,
-          role: 'teacher',
-          teacherName: currentUser.name || currentUser.nickname || currentUser.email,
-        })
-        setCurrentView('teacher-session')
+
+      const sessions = data.sessions || []
+
+      // 2. Find matching session code
+      const matchedSession = sessions.find(
+        (s: any) => s.code === sessionCode.trim().toUpperCase()
+      )
+
+      // 3. ❌ INVALID CODE CHECK
+      if (!matchedSession) {
+        setConflictMsg('❌ Wrong session code. Please enter correct one.')
+        setLoading(false)
+        return
       }
-    } catch {
-      // handle error
+
+      // 4. OPTIONAL: register student into session
+      await fetch('/api/sessions', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionCode: matchedSession.code,
+          studentId: currentUser.id,
+          nickname:
+            currentUser.nickname || currentUser.name || currentUser.email,
+        }),
+      })
+
+      // 5. SUCCESS → JOIN SESSION
+      clearCaptions()
+      clearMessages()
+
+      setActiveSession({
+        code: matchedSession.code,
+        role: 'student',
+        teacherName: matchedSession.teacherName || 'Teacher',
+      })
+
+      setCurrentView('student-session')
+    } catch (err) {
+      setConflictMsg('Server error. Try again.')
     } finally {
       setLoading(false)
     }
   }
+        if (res.ok) {
+          clearCaptions()
+          clearMessages()
+          setActiveSession({
+            code: data.session.code,
+            role: 'teacher',
+            teacherName: currentUser.name || currentUser.nickname || currentUser.email,
+          })
+          setCurrentView('teacher-session')
+        }
+      } catch {
+        // handle error
+      } finally {
+        setLoading(false)
+      }
+    }
 
   const handleJoinSession = async () => {
     if (!currentUser || !sessionCode.trim()) return
@@ -142,7 +189,7 @@ export function RoleSelectPage() {
             <Input
               placeholder="Enter session code"
               value={sessionCode}
-              onChange={(e) => setSessionCode(e.target.value)}
+              onChange={(e) => setSessionCode(e.target.value.toUpperCase())}
               onKeyDown={(e) => e.key === 'Enter' && handleJoinSession()}
             />
             <Button onClick={handleJoinSession} disabled={loading || !sessionCode.trim()} className="w-full" variant="outline">

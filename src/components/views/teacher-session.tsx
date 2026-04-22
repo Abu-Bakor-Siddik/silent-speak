@@ -100,7 +100,7 @@ export function TeacherSession() {
   // WebSocket connection
   useEffect(() => {
     if (!activeSession) return
-
+ 
     const socket = io('https://silent-speak-tp68.onrender.com/')
     socketRef.current = socket
 

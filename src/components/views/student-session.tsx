@@ -360,7 +360,7 @@ export function StudentSession() {
                     size="sm"
                     className="h-6 text-xs"
                     onClick={() => setEnhancedText('')}
-                  >
+                  > 
                     Dismiss
                   </Button>
                 </div>
