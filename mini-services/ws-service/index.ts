@@ -57,6 +57,8 @@ io.on("connection", (socket) => {
       });
       socket.join(data.sessionCode);
 
+      socket.emit("joined-room", { sessionCode: data.sessionCode });
+
       // Notify teacher
       io.to(session.teacherSocketId).emit("student-joined", {
         studentId: data.studentId,
@@ -64,7 +66,9 @@ io.on("connection", (socket) => {
       });
 
       // Send existing captions to student
-      socket.emit("caption-history", session.captions);
+      setTimeout(() => {
+        socket.emit("caption-history", session.captions);
+      }, 300);
 
       console.log(
         `Student ${data.nickname} joined session ${data.sessionCode}`
@@ -84,8 +88,8 @@ io.on("connection", (socket) => {
         timestamp: data.timestamp,
       });
 
-      // 🔥 FIX: broadcast to entire room INCLUDING all clients reliably
-      io.to(data.sessionCode).emit("caption", {
+      // FIX: broadcast to entire room INCLUDING all clients reliably
+      io.in(data.sessionCode).emit("caption", {
         text: data.text,
         timestamp: data.timestamp,
       });
@@ -103,39 +107,26 @@ io.on("connection", (socket) => {
   );
 
   // Send message (teacher to students or student to teacher)
-  socket.on(
-  "message",
-  (data: {
-    sessionCode: string;
-    senderId: string;
-    senderName: string;
-    senderRole: string;
-    content: string;
-    recipientId?: string;
-    type?: string;
-  }) => {
-    const session = sessions.get(data.sessionCode);
-    if (!session) return;
+  socket.on("message", (data) => {
+  const session = sessions.get(data.sessionCode);
+  if (!session) return;
 
-    // ✅ DIRECT MESSAGE
-    if (data.recipientId) {
-      if (data.senderRole === "teacher") {
-        // Teacher → specific student
-        const student = session.students.get(data.recipientId);
-        if (student) {
-          io.to(student.socketId).emit("message", data);
-        }
-      } else {
-        // Student → teacher
-        io.to(session.teacherSocketId).emit("message", data);
+  // Direct message
+  if (data.recipientId) {
+    if (data.senderRole === "teacher") {
+      const student = session.students.get(data.recipientId);
+      if (student) {
+        io.to(student.socketId).emit("message", data);
       }
-      return;
+    } else {
+      io.to(session.teacherSocketId).emit("message", data);
     }
-
-    // ✅ BROADCAST MESSAGE
-    io.to(data.sessionCode).emit("message", data);
+    return;
   }
-);
+
+  // Broadcast message
+  io.to(data.sessionCode).emit("message", data);
+});
 
   // Quick communication (student sends quick phrase with TTS)
   socket.on(
