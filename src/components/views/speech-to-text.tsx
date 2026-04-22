@@ -24,7 +24,7 @@ import {
   CheckCircle,
   Languages,
 } from 'lucide-react'
-
+// hello
 interface TranscriptEntry {
   text: string
   timestamp: number
