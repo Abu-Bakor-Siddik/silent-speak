@@ -228,7 +228,6 @@ export function TeacherSession() {
       type: 'text',
     }
     socketRef.current.emit('message', msg)
-    addMessage(msg)
     setMessageInput('')
   }
 
@@ -244,7 +243,6 @@ export function TeacherSession() {
       type: 'text',
     }
     socketRef.current.emit('message', msg)
-    addMessage(msg)
     setDmMessage('')
     setShowDmDialog(false)
   }

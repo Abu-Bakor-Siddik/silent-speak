@@ -31,7 +31,13 @@ io.on("connection", (socket) => {
         students: new Map(),
         captions: [],
       });
+
       socket.join(data.sessionCode);
+
+      // IMPORTANT: also notify teacher joined room
+      socket.emit("session-ready", {
+        sessionCode: data.sessionCode,
+      });
       console.log(`Session created: ${data.sessionCode} by ${data.teacherName}`);
     }
   );
@@ -73,10 +79,13 @@ io.on("connection", (socket) => {
       const session = sessions.get(data.sessionCode);
       if (!session) return;
 
-      session.captions.push({ text: data.text, timestamp: data.timestamp });
+      session.captions.push({
+        text: data.text,
+        timestamp: data.timestamp,
+      });
 
-      // Broadcast to all students in the session
-      socket.to(data.sessionCode).emit("caption", {
+      // 🔥 FIX: broadcast to entire room INCLUDING all clients reliably
+      io.to(data.sessionCode).emit("caption", {
         text: data.text,
         timestamp: data.timestamp,
       });
@@ -95,41 +104,38 @@ io.on("connection", (socket) => {
 
   // Send message (teacher to students or student to teacher)
   socket.on(
-    "message",
-    (data: {
-      sessionCode: string;
-      senderId: string;
-      senderName: string;
-      senderRole: string;
-      content: string;
-      recipientId?: string;
-      type?: string;
-    }) => {
-      const session = sessions.get(data.sessionCode);
-      if (!session) return;
+  "message",
+  (data: {
+    sessionCode: string;
+    senderId: string;
+    senderName: string;
+    senderRole: string;
+    content: string;
+    recipientId?: string;
+    type?: string;
+  }) => {
+    const session = sessions.get(data.sessionCode);
+    if (!session) return;
 
-      if (data.recipientId) {
-        // Direct message
-        if (data.senderRole === "teacher") {
-          // Teacher to specific student
-          const student = session.students.get(data.recipientId);
-          if (student) {
-            io.to(student.socketId).emit("message", data);
-          }
-        } else {
-          // Student to teacher
-          io.to(session.teacherSocketId).emit("message", data);
+    // ✅ DIRECT MESSAGE
+    if (data.recipientId) {
+      if (data.senderRole === "teacher") {
+        // Teacher → specific student
+        const student = session.students.get(data.recipientId);
+        if (student) {
+          io.to(student.socketId).emit("message", data);
         }
       } else {
-        // Broadcast message
-        if (data.senderRole === "teacher") {
-          socket.to(data.sessionCode).emit("message", data);
-        } else {
-          io.to(session.teacherSocketId).emit("message", data);
-        }
+        // Student → teacher
+        io.to(session.teacherSocketId).emit("message", data);
       }
+      return;
     }
-  );
+
+    // ✅ BROADCAST MESSAGE
+    io.to(data.sessionCode).emit("message", data);
+  }
+);
 
   // Quick communication (student sends quick phrase with TTS)
   socket.on(

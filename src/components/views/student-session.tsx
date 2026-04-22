@@ -131,7 +131,6 @@ export function StudentSession() {
       type: 'text',
     }
     socketRef.current.emit('message', msg)
-    addMessage(msg)
     setMessageInput('')
   }
 
