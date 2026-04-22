@@ -156,13 +156,13 @@ function Navbar() {
   ]
 
   const handleLogout = () => {
-  setCurrentUser(null)
-  setActiveSession(null)
-  setCurrentView('login')
-
+  useAppStore.getState().setCurrentUser(null)
+  useAppStore.getState().setActiveSession(null)
   useAppStore.getState().resetApp()
 
-  localStorage.removeItem('silent-speak-storage')
+  setTimeout(() => {
+    useAppStore.getState().setCurrentView('login')
+  }, 0)
 }
 
   const initials = currentUser?.name
@@ -679,13 +679,17 @@ export function AppShell() {
   const currentUser = useAppStore((s) => s.currentUser)
   const setCurrentView = useAppStore((s) => s.setCurrentView)
 
-  useEffect(() => {
-  if (currentUser) {
-    setCurrentView('dashboard')
-  } else {
-    setCurrentView('landing')
-  }
-}, [currentUser])
+  const hydrated = useAppStore.persist.hasHydrated?.() ?? true
+
+    useEffect(() => {
+      if (!hydrated) return
+
+      if (currentUser) {
+        setCurrentView('dashboard')
+      } else {
+        setCurrentView('landing')
+      }
+    }, [currentUser, hydrated])
 
   const isAuthView = AUTH_VIEWS.includes(currentView)
   const showNavbar = !isAuthView && currentUser !== null
