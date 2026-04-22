@@ -158,6 +158,16 @@ function Navbar() {
   const handleLogout = () => {
     setCurrentUser(null)
     setCurrentView('landing')
+
+    //  full reset
+    useAppStore.getState().resetApp()
+
+    //  force wipe persisted storage
+    localStorage.removeItem('silent-speak-storage')
+    sessionStorage.clear()
+
+    //  hard reset
+    window.location.href = '/login'
   }
 
   const initials = currentUser?.name

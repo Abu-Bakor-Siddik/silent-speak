@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface User {
@@ -158,6 +159,8 @@ const defaultSettings: AppSettings = {
 
 // ─── Store ───────────────────────────────────────────────────────────────────
 
+
+
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
@@ -181,6 +184,21 @@ export const useAppStore = create<AppState>()(
       activeSession: session,
       hasActiveSession: session !== null,
     }),
+
+    resetApp: () => {
+      set({
+        currentUser: null,
+        activeSession: null,
+        captions: [],
+        messages: [],
+        participants: [],
+        tasks: [],
+        fullCaptionText: '',
+        hasActiveSession: false,
+      })
+
+      localStorage.removeItem('silent-speak-storage')
+    }
 
   // Live captions
   captions: [],
@@ -236,7 +254,7 @@ export const useAppStore = create<AppState>()(
   // Quick navigation for active session
   hasActiveSession: false,
     setHasActiveSession: (v) => set({ hasActiveSession: v }),
-}),
+    }),
 {
   name: 'silent-speak-storage',
 }

@@ -1,3 +1,5 @@
+'use client'
+import { useEffect } from 'react';
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -12,6 +14,18 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+
+useEffect(() => {
+  const stored = localStorage.getItem('silent-speak-storage')
+
+  if (!stored) return
+
+  const parsed = JSON.parse(stored)
+
+  if (!parsed?.state?.currentUser) {
+    window.location.href = '/login'
+  }
+}, [])
 
 export const metadata: Metadata = {
   title: "SilentSpeak - Accessible Learning Platform",
