@@ -198,7 +198,7 @@ export const useAppStore = create<AppState>()(
       })
 
       localStorage.removeItem('silent-speak-storage')
-    }
+    },
 
   // Live captions
   captions: [],
