@@ -156,19 +156,14 @@ function Navbar() {
   ]
 
   const handleLogout = () => {
-    setCurrentUser(null)
-    setCurrentView('landing')
+  setCurrentUser(null)
+  setActiveSession(null)
+  setCurrentView('login')
 
-    //  full reset
-    useAppStore.getState().resetApp()
+  useAppStore.getState().resetApp()
 
-    //  force wipe persisted storage
-    localStorage.removeItem('silent-speak-storage')
-    sessionStorage.clear()
-
-    //  hard reset
-    window.location.href = '/login'
-  }
+  localStorage.removeItem('silent-speak-storage')
+}
 
   const initials = currentUser?.name
     ? currentUser.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
@@ -682,10 +677,29 @@ function AccessibilityManager() {
 export function AppShell() {
   const currentView = useAppStore((s) => s.currentView)
   const currentUser = useAppStore((s) => s.currentUser)
+  const setCurrentView = useAppStore((s) => s.setCurrentView)
+
+  useEffect(() => {
+    if (!currentUser && currentView !== 'login') {
+      setCurrentView('landing')
+    }
+  }, [currentUser])
 
   const isAuthView = AUTH_VIEWS.includes(currentView)
   const showNavbar = !isAuthView && currentUser !== null
   const CurrentViewComponent = VIEW_MAP[currentView]
+
+  useEffect(() => {
+  const stored = localStorage.getItem('silent-speak-storage')
+
+  if (!stored) return
+
+    const parsed = JSON.parse(stored)
+
+    if (parsed?.state?.currentUser) {
+      setCurrentUser(parsed.state.currentUser)
+    }
+  }, [])
 
   return (
     <div className="min-h-screen flex flex-col">
