@@ -1,15 +1,27 @@
 import { createServer } from "http";
 import { Server } from "socket.io";
-
+ 
 const PORT = Number(process.env.PORT) || 3003;
 
-const httpServer = createServer();
+const httpServer = createServer((req, res) => {
+  // Health check endpoint — keeps Render from spinning down
+  // and lets UptimeRobot ping it
+  if (req.url === "/health" || req.url === "/") {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("OK");
+  }
+});
 
 const io = new Server(httpServer, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"],
   },
+  // Force websocket only — avoids Render free-tier polling issues
+  transports: ["websocket"],
+  // Increase ping timeout so Render's slow cold-starts don't drop sockets
+  pingTimeout: 60000,
+  pingInterval: 25000,
 });
 
 httpServer.listen(PORT, () => {
@@ -23,33 +35,41 @@ const sessions = new Map<
     teacherSocketId: string;
     students: Map<string, { socketId: string; nickname: string }>;
     captions: { text: string; timestamp: number }[];
+    fullCaptionText: string;
   }
 >();
 
 io.on("connection", (socket) => {
   console.log(`Connected: ${socket.id}`);
 
-  // Teacher creates a session
+  // ── Teacher creates / re-registers a session ──────────────────────────────
   socket.on(
     "create-session",
     (data: { sessionCode: string; teacherName: string }) => {
-      sessions.set(data.sessionCode, {
-        teacherSocketId: socket.id,
-        students: new Map(),
-        captions: [],
-      });
+      const existing = sessions.get(data.sessionCode);
 
-      socket.join(data.sessionCode);
+      if (existing) {
+        // Session already exists (teacher reconnected) — just update socket ID
+        existing.teacherSocketId = socket.id;
+        socket.join(data.sessionCode);
+        console.log(`Session re-registered: ${data.sessionCode} (teacher reconnected)`);
+      } else {
+        // Brand new session
+        sessions.set(data.sessionCode, {
+          teacherSocketId: socket.id,
+          students: new Map(),
+          captions: [],
+          fullCaptionText: "",
+        });
+        socket.join(data.sessionCode);
+        console.log(`Session created: ${data.sessionCode} by ${data.teacherName}`);
+      }
 
-      // IMPORTANT: also notify teacher joined room
-      socket.emit("session-ready", {
-        sessionCode: data.sessionCode,
-      });
-      console.log(`Session created: ${data.sessionCode} by ${data.teacherName}`);
+      socket.emit("session-ready", { sessionCode: data.sessionCode });
     }
   );
 
-  // Student joins a session
+  // ── Student joins a session ───────────────────────────────────────────────
   socket.on(
     "join-session",
     (data: { sessionCode: string; studentId: string; nickname: string }) => {
@@ -58,12 +78,14 @@ io.on("connection", (socket) => {
         socket.emit("session-error", { message: "Session not found" });
         return;
       }
+
+      // Update or add student record (handles reconnects)
       session.students.set(data.studentId, {
         socketId: socket.id,
         nickname: data.nickname,
       });
-      socket.join(data.sessionCode);
 
+      socket.join(data.sessionCode);
       socket.emit("joined-room", { sessionCode: data.sessionCode });
 
       // Notify teacher
@@ -73,55 +95,58 @@ io.on("connection", (socket) => {
       });
 
       // Send existing captions to student
+      if (session.captions.length > 0) {
+        socket.emit("caption-history", session.captions);
+      }
+      if (session.fullCaptionText) {
+        socket.emit("caption-bulk", { fullText: session.fullCaptionText });
+      }
 
-
-      socket.emit("caption-history", session.captions);
-
-      console.log(
-        `Student ${data.nickname} joined session ${data.sessionCode}`
-      );
+      console.log(`Student ${data.nickname} joined session ${data.sessionCode}`);
     }
   );
 
-  // Teacher sends live caption
-  socket.on("caption", (data) => {
+  // ── Teacher sends live caption ────────────────────────────────────────────
+  // Use socket.to (not io.to) so caption is NOT echoed back to the teacher.
+  // The teacher already adds the caption locally to avoid latency.
+  socket.on("caption", (data: { sessionCode: string; text: string; timestamp: number }) => {
     const session = sessions.get(data.sessionCode);
     if (!session) return;
 
-    session.captions.push({
-      text: data.text,
-      timestamp: data.timestamp,
-    });
+    session.captions.push({ text: data.text, timestamp: data.timestamp });
 
-    // Use socket.to (not io.to) to broadcast to everyone EXCEPT the sender (teacher).
-    // The teacher already adds the caption locally, so re-broadcasting back to them
-    // would cause duplicates.
+    // Broadcast to everyone in room EXCEPT the teacher who sent it
     socket.to(data.sessionCode).emit("caption", {
       text: data.text,
       timestamp: data.timestamp,
     });
   });
 
-  // Teacher sends bulk captions (for full caption updates)
+  // ── Bulk caption text (full transcript) ──────────────────────────────────
   socket.on(
     "caption-bulk",
     (data: { sessionCode: string; fullText: string }) => {
+      const session = sessions.get(data.sessionCode);
+      if (!session) return;
+
+      session.fullCaptionText = data.fullText;
+      // Send to students only (not back to teacher)
       socket.to(data.sessionCode).emit("caption-bulk", {
         fullText: data.fullText,
       });
     }
   );
 
-  // Send message (teacher to students or student to teacher)
-  // Use socket.to (excludes sender) — each side already adds their own message locally.
-  socket.on("message", (data) => {
+  // ── Messages ─────────────────────────────────────────────────────────────
+  // Use socket.to (not io.to) — sender already adds their message locally.
+  socket.on("message", (data: { sessionCode: string; [key: string]: any }) => {
     const session = sessions.get(data.sessionCode);
     if (!session) return;
 
     socket.to(data.sessionCode).emit("message", data);
   });
 
-  // Quick communication (student sends quick phrase with TTS)
+  // ── Quick communication (student phrase) ─────────────────────────────────
   socket.on(
     "quick-comm",
     (data: {
@@ -133,25 +158,15 @@ io.on("connection", (socket) => {
       const session = sessions.get(data.sessionCode);
       if (!session) return;
 
-      // Send to teacher
       io.to(session.teacherSocketId).emit("quick-comm", {
         senderId: data.senderId,
         senderName: data.senderName,
         phrase: data.phrase,
       });
-
-      // Also send as a message
-      io.to(session.teacherSocketId).emit("message", {
-        senderId: data.senderId,
-        senderName: data.senderName,
-        senderRole: "student",
-        content: data.phrase,
-        type: "quick-comm",
-      });
     }
   );
 
-  // Task assignment
+  // ── Task assignment ───────────────────────────────────────────────────────
   socket.on(
     "task-assigned",
     (data: {
@@ -168,7 +183,7 @@ io.on("connection", (socket) => {
     }
   );
 
-  // Teacher mic toggle notification
+  // ── Mic toggle ───────────────────────────────────────────────────────────
   socket.on(
     "mic-toggle",
     (data: { sessionCode: string; isMuted: boolean }) => {
@@ -176,7 +191,7 @@ io.on("connection", (socket) => {
     }
   );
 
-  // Leave session
+  // ── Leave session ────────────────────────────────────────────────────────
   socket.on(
     "leave-session",
     (data: { sessionCode: string; userId: string; role: string }) => {
@@ -184,47 +199,36 @@ io.on("connection", (socket) => {
       if (!session) return;
 
       if (data.role === "teacher") {
-        // End the session
         io.to(data.sessionCode).emit("session-ended", {
           message: "Teacher has ended the session",
         });
         sessions.delete(data.sessionCode);
       } else {
-        // Student leaves
         session.students.delete(data.userId);
         io.to(session.teacherSocketId).emit("student-left", {
           studentId: data.userId,
         });
       }
+
       socket.leave(data.sessionCode);
     }
   );
 
-  // Whiteboard data
-  socket.on(
-    "whiteboard",
-    (data: { sessionCode: string; drawing: string }) => {
-      socket.to(data.sessionCode).emit("whiteboard", { drawing: data.drawing });
-    }
-  );
-
-  // Disconnect
+  // ── Disconnect cleanup ───────────────────────────────────────────────────
   socket.on("disconnect", () => {
     console.log(`Disconnected: ${socket.id}`);
-    // Clean up sessions where this socket was teacher or student
+
     for (const [code, session] of sessions.entries()) {
       if (session.teacherSocketId === socket.id) {
-        io.to(code).emit("session-ended", {
-          message: "Teacher has disconnected",
-        });
-        sessions.delete(code);
+        // Don't delete session on teacher disconnect — they may reconnect.
+        // Just log it. The session will be cleaned up when teacher calls leave-session,
+        // or when they reconnect and re-emit create-session.
+        console.log(`Teacher disconnected from session ${code} — keeping session alive for reconnect`);
       } else {
         for (const [studentId, student] of session.students.entries()) {
           if (student.socketId === socket.id) {
             session.students.delete(studentId);
-            io.to(session.teacherSocketId).emit("student-left", {
-              studentId,
-            });
+            io.to(session.teacherSocketId).emit("student-left", { studentId });
             break;
           }
         }
@@ -232,5 +236,3 @@ io.on("connection", (socket) => {
     }
   });
 });
-
-console.log(`WebSocket service running on port ${PORT}`);

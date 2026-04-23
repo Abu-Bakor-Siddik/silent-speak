@@ -1,5 +1,5 @@
 'use client'
-
+ 
 import { useState, useEffect, useRef } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { Button } from '@/components/ui/button'
@@ -8,98 +8,82 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { useAppStore } from '@/store/app-store'
-import {
-  Download,
-  Sparkles,
-  Save,
-  Volume2,
-  LogOut,
-  AlertTriangle,
-  Send,
-} from 'lucide-react'
+import { Download, Sparkles, Save, Volume2, LogOut, AlertTriangle, Send } from 'lucide-react'
 
-const WS_URL = 'https://silent-speak-tp68.onrender.com/'
+const WS_URL = 'https://silent-speak-tp68.onrender.com'
 
 export function StudentSession() {
-  const currentUser = useAppStore((s) => s.currentUser)
-  const activeSession = useAppStore((s) => s.activeSession)
-  const captions = useAppStore((s) => s.captions)
-  const addCaption = useAppStore((s) => s.addCaption)
-  const clearCaptions = useAppStore((s) => s.clearCaptions)
-  const fullCaptionText = useAppStore((s) => s.fullCaptionText)
+  const currentUser    = useAppStore((s) => s.currentUser)
+  const activeSession  = useAppStore((s) => s.activeSession)
+  const captions       = useAppStore((s) => s.captions)
+  const addCaption     = useAppStore((s) => s.addCaption)
+  const clearCaptions  = useAppStore((s) => s.clearCaptions)
+  const fullCaptionText    = useAppStore((s) => s.fullCaptionText)
   const setFullCaptionText = useAppStore((s) => s.setFullCaptionText)
-  const messages = useAppStore((s) => s.messages)
+  const messages   = useAppStore((s) => s.messages)
   const addMessage = useAppStore((s) => s.addMessage)
   const setActiveSession = useAppStore((s) => s.setActiveSession)
-  const setCurrentView = useAppStore((s) => s.setCurrentView)
-  const addTask = useAppStore((s) => s.addTask)
-  const tasks = useAppStore((s) => s.tasks)
+  const setCurrentView   = useAppStore((s) => s.setCurrentView)
+  const addTask  = useAppStore((s) => s.addTask)
+  const tasks    = useAppStore((s) => s.tasks)
 
   const socketRef = useRef<Socket | null>(null)
   const [messageInput, setMessageInput] = useState('')
-  const [autoScroll, setAutoScroll] = useState(true)
-  const [enhancing, setEnhancing] = useState(false)
+  const [autoScroll, setAutoScroll]     = useState(true)
+  const [enhancing, setEnhancing]       = useState(false)
   const [enhancedText, setEnhancedText] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving]             = useState(false)
   const [sessionEnded, setSessionEnded] = useState(false)
-  const [isConnected, setIsConnected] = useState(false)
+  const [isConnected, setIsConnected]   = useState(false)
   const captionsEndRef = useRef<HTMLDivElement>(null)
 
-  // Stable refs for use inside socket callbacks
   const activeSessionRef = useRef(activeSession)
+  const currentUserRef   = useRef(currentUser)
   useEffect(() => { activeSessionRef.current = activeSession }, [activeSession])
-  const currentUserRef = useRef(currentUser)
-  useEffect(() => { currentUserRef.current = currentUser }, [currentUser])
+  useEffect(() => { currentUserRef.current   = currentUser   }, [currentUser])
 
   // Auto-scroll
   useEffect(() => {
     if (autoScroll && captionsEndRef.current) {
-      const container = captionsEndRef.current.parentElement
-      if (container) container.scrollTop = container.scrollHeight
+      const c = captionsEndRef.current.parentElement
+      if (c) c.scrollTop = c.scrollHeight
     }
   }, [captions, autoScroll])
 
-  // ─── WebSocket connection ──────────────────────────────────────────────────
+  // ── WebSocket setup ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!activeSession || !currentUser) return
 
-    // Use autoConnect: false so we can set socketRef BEFORE the connect fires
     const socket = io(WS_URL, {
+      transports: ['websocket'],   // skip polling — fixes Render free-tier issues
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
       autoConnect: false,
     })
 
-    // Set ref BEFORE connecting
-    socketRef.current = socket
+    socketRef.current = socket   // set ref BEFORE connecting
 
     socket.on('connect', () => {
-      console.log('Student connected:', socket.id)
+      console.log('[Student] connected', socket.id)
       setIsConnected(true)
-      // Re-join session on every (re)connect
-      const session = activeSessionRef.current
-      const user = currentUserRef.current
-      if (session && user) {
+      const s = activeSessionRef.current
+      const u = currentUserRef.current
+      if (s && u) {
         socket.emit('join-session', {
-          sessionCode: session.code,
-          studentId: user.id,
-          nickname: user.nickname || user.name,
+          sessionCode: s.code,
+          studentId: u.id,
+          nickname: u.nickname || u.name,
         })
       }
     })
 
-    socket.on('disconnect', () => setIsConnected(false))
+    socket.on('disconnect', (reason) => {
+      console.log('[Student] disconnected', reason)
+      setIsConnected(false)
+    })
 
     socket.on('caption', (data: { text: string; timestamp: number }) => {
       addCaption(data)
@@ -119,10 +103,10 @@ export function StudentSession() {
     })
 
     socket.on('task-assigned', (task: any) => {
-      const session = activeSessionRef.current
+      const s = activeSessionRef.current
       addTask({
         id: task.id,
-        sessionId: session?.code || '',
+        sessionId: s?.code || '',
         teacherId: '',
         title: task.title,
         description: task.description,
@@ -137,18 +121,13 @@ export function StudentSession() {
       setSessionEnded(true)
     })
 
-    // Now connect
     socket.connect()
 
     return () => {
-      const session = activeSessionRef.current
-      const user = currentUserRef.current
-      if (session && user) {
-        socket.emit('leave-session', {
-          sessionCode: session.code,
-          userId: user.id,
-          role: 'student',
-        })
+      const s = activeSessionRef.current
+      const u = currentUserRef.current
+      if (s && u && socket.connected) {
+        socket.emit('leave-session', { sessionCode: s.code, userId: u.id, role: 'student' })
       }
       socket.disconnect()
       socketRef.current = null
@@ -156,9 +135,10 @@ export function StudentSession() {
     }
   }, [activeSession, currentUser, addCaption, clearCaptions, setFullCaptionText, addMessage, addTask])
 
-  // ─── Messaging ─────────────────────────────────────────────────────────────
+  // ── Messages ───────────────────────────────────────────────────────────────
   const sendMessage = () => {
-    if (!messageInput.trim() || !socketRef.current || !activeSession) return
+    const socket = socketRef.current
+    if (!messageInput.trim() || !socket?.connected || !activeSession) return
     const msg = {
       sessionCode: activeSession.code,
       senderId: currentUser?.id || '',
@@ -167,25 +147,26 @@ export function StudentSession() {
       content: messageInput.trim(),
       type: 'text',
     }
-    socketRef.current.emit('message', msg)
+    socket.emit('message', msg)
     addMessage(msg)
     setMessageInput('')
   }
 
   const sendQuickComm = (phrase: string) => {
-    if (!socketRef.current || !activeSession) return
+    const socket = socketRef.current
+    if (!socket?.connected || !activeSession) return
 
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel()
-      const cleanPhrase = phrase.replace(/[^\w\s.,!?']/g, '').trim()
-      if (cleanPhrase) {
-        const utterance = new SpeechSynthesisUtterance(cleanPhrase)
-        utterance.rate = 0.9
-        window.speechSynthesis.speak(utterance)
+      const clean = phrase.replace(/[^\w\s.,!?']/g, '').trim()
+      if (clean) {
+        const u = new SpeechSynthesisUtterance(clean)
+        u.rate = 0.9
+        window.speechSynthesis.speak(u)
       }
     }
 
-    socketRef.current.emit('quick-comm', {
+    socket.emit('quick-comm', {
       sessionCode: activeSession.code,
       senderId: currentUser?.id || '',
       senderName: currentUser?.nickname || currentUser?.name || 'Student',
@@ -201,42 +182,31 @@ export function StudentSession() {
   }
 
   const downloadCaptions = () => {
-    const content = captions
-      .map((c) => `[${new Date(c.timestamp).toLocaleTimeString()}] ${c.text}`)
-      .join('\n')
+    const content = captions.map((c) => `[${new Date(c.timestamp).toLocaleTimeString()}] ${c.text}`).join('\n')
     const blob = new Blob([content], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     a.download = `captions-${activeSession?.code || 'session'}-${new Date().toISOString().slice(0, 10)}.txt`
-    a.click()
-    URL.revokeObjectURL(url)
+    a.click(); URL.revokeObjectURL(url)
   }
 
   const enhanceWithAI = async () => {
-    const textToEnhance = fullCaptionText || captions.map((c) => c.text).join(' ')
-    if (!textToEnhance.trim()) return
+    const text = fullCaptionText || captions.map((c) => c.text).join(' ')
+    if (!text.trim()) return
     setEnhancing(true)
     try {
-      const res = await fetch('/api/ai/enhance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: textToEnhance }),
-      })
+      const res  = await fetch('/api/ai/enhance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) })
       const data = await res.json()
       if (res.ok && data.enhanced) setEnhancedText(data.enhanced)
-    } catch {
-      // silent
-    } finally {
-      setEnhancing(false)
-    }
+    } catch {} finally { setEnhancing(false) }
   }
 
   const saveAsNote = async () => {
     if (!currentUser) return
     setSaving(true)
-    const rawText = fullCaptionText || captions.map((c) => c.text).join(' ')
-    const textToSave = enhancedText || rawText
+    const raw  = fullCaptionText || captions.map((c) => c.text).join(' ')
+    const save = enhancedText || raw
     try {
       await fetch('/api/notes', {
         method: 'POST',
@@ -244,26 +214,19 @@ export function StudentSession() {
         body: JSON.stringify({
           userId: currentUser.id,
           title: `Session ${activeSession?.code || 'Notes'} - ${new Date().toLocaleDateString()}`,
-          content: textToSave,
-          rawContent: enhancedText ? rawText : undefined,
+          content: save,
+          rawContent: enhancedText ? raw : undefined,
           type: 'session',
           sessionId: activeSession?.code,
         }),
       })
-    } catch {
-      // silent
-    } finally {
-      setSaving(false)
-    }
+    } catch {} finally { setSaving(false) }
   }
 
   const handleLeaveSession = () => {
-    if (socketRef.current && activeSession && currentUser) {
-      socketRef.current.emit('leave-session', {
-        sessionCode: activeSession.code,
-        userId: currentUser.id,
-        role: 'student',
-      })
+    const socket = socketRef.current
+    if (socket?.connected && activeSession && currentUser) {
+      socket.emit('leave-session', { sessionCode: activeSession.code, userId: currentUser.id, role: 'student' })
     }
     setActiveSession(null)
     setCurrentView('dashboard')
@@ -274,9 +237,7 @@ export function StudentSession() {
       <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="max-w-md w-full">
           <CardHeader><CardTitle>No Active Session</CardTitle></CardHeader>
-          <CardContent>
-            <Button onClick={() => setCurrentView('role-select')}>Join a Session</Button>
-          </CardContent>
+          <CardContent><Button onClick={() => setCurrentView('role-select')}>Join a Session</Button></CardContent>
         </Card>
       </div>
     )
@@ -308,7 +269,8 @@ export function StudentSession() {
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-bold">Student Session</h1>
           <Badge variant="secondary" className="font-mono">{activeSession.code}</Badge>
-          <span className={`inline-block size-2.5 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-400'}`} />
+          <span className={`inline-block size-2.5 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-yellow-400 animate-pulse'}`} />
+          <span className="text-xs text-muted-foreground">{isConnected ? 'Connected' : 'Reconnecting...'}</span>
         </div>
         <Button variant="outline" size="sm" className="gap-1.5 min-h-[44px]" onClick={handleLeaveSession}>
           <LogOut className="size-4" />Leave Session
@@ -322,10 +284,8 @@ export function StudentSession() {
             <div className="flex items-center justify-between flex-wrap gap-2">
               <CardTitle className="text-base">Live Captions</CardTitle>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="student-auto-scroll" className="text-xs">Auto-scroll</Label>
-                  <Switch id="student-auto-scroll" checked={autoScroll} onCheckedChange={setAutoScroll} />
-                </div>
+                <Label htmlFor="student-auto-scroll" className="text-xs">Auto-scroll</Label>
+                <Switch id="student-auto-scroll" checked={autoScroll} onCheckedChange={setAutoScroll} />
                 <Button variant="outline" size="sm" className="gap-1 min-h-[44px]" onClick={downloadCaptions} disabled={captions.length === 0}>
                   <Download className="size-3.5" />Download
                 </Button>
@@ -341,8 +301,7 @@ export function StudentSession() {
               ) : (
                 captions.map((c, i) => (
                   <p key={i} className="text-sm">
-                    <span className="text-muted-foreground text-xs">{new Date(c.timestamp).toLocaleTimeString()}</span>{' '}
-                    {c.text}
+                    <span className="text-muted-foreground text-xs">{new Date(c.timestamp).toLocaleTimeString()}</span>{' '}{c.text}
                   </p>
                 ))
               )}
@@ -381,23 +340,8 @@ export function StudentSession() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-2">
-              {[
-                '👍 I understand',
-                '❓ I have a question',
-                '🕐 Can you repeat?',
-                '🔇 Too fast please',
-                '✅ I am ready',
-                '🤔 I need help',
-                '🙏 Please wait',
-                '👋 I am here',
-              ].map((phrase) => (
-                <Button
-                  key={phrase}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs h-auto py-2.5 min-h-[44px] whitespace-normal"
-                  onClick={() => sendQuickComm(phrase)}
-                >
+              {['👍 I understand','❓ I have a question','🕐 Can you repeat?','🔇 Too fast please','✅ I am ready','🤔 I need help','🙏 Please wait','👋 I am here'].map((phrase) => (
+                <Button key={phrase} variant="outline" size="sm" className="text-xs h-auto py-2.5 min-h-[44px] whitespace-normal" onClick={() => sendQuickComm(phrase)}>
                   {phrase}
                 </Button>
               ))}
@@ -410,19 +354,17 @@ export function StudentSession() {
 
         {/* Messages */}
         <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Messages</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Messages</CardTitle></CardHeader>
           <CardContent>
             <div className="min-h-[150px] max-h-[250px] overflow-y-auto space-y-2 rounded-md border p-3">
               {messages.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No messages yet</p>
               ) : (
                 messages.map((m, i) => (
-                  <div key={i} className="text-sm">
-                    <span className="font-medium">{m.senderName}:</span> {m.content}
+                  <div key={i} className={`text-sm p-1.5 rounded ${m.senderRole === 'student' && m.senderId === currentUser?.id ? 'bg-primary/5' : 'bg-muted/40'}`}>
+                    <span className="font-medium">{m.senderName}:</span>{' '}{m.content}
                     {m.recipientId && m.recipientId === currentUser?.id && (
-                      <span className="text-xs text-primary ml-1">(DM)</span>
+                      <span className="text-xs text-primary ml-1">(DM for you)</span>
                     )}
                   </div>
                 ))
@@ -430,12 +372,12 @@ export function StudentSession() {
             </div>
             <div className="flex gap-2 mt-2">
               <Input
-                placeholder="Send a message..."
+                placeholder="Send a message to teacher..."
                 value={messageInput}
                 onChange={(e) => setMessageInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
               />
-              <Button size="sm" onClick={sendMessage} className="min-h-[44px]" disabled={!isConnected}>
+              <Button size="sm" className="min-h-[44px]" onClick={sendMessage} disabled={!isConnected}>
                 <Send className="size-4" />
               </Button>
             </div>
@@ -444,9 +386,7 @@ export function StudentSession() {
 
         {/* Tasks */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Assigned Tasks</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Assigned Tasks</CardTitle></CardHeader>
           <CardContent>
             {tasks.length === 0 ? (
               <p className="text-sm text-muted-foreground">No tasks assigned yet</p>

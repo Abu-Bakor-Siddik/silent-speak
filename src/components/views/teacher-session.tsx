@@ -1,5 +1,5 @@
 'use client'
-
+ 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { Button } from '@/components/ui/button'
@@ -33,104 +33,95 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useAppStore } from '@/store/app-store'
-import {
-  Mic,
-  MicOff,
-  Copy,
-  Download,
-  Send,
-  Plus,
-  Timer,
-} from 'lucide-react'
+import { Mic, MicOff, Copy, Download, Send, Plus, Timer } from 'lucide-react'
 
 type TaskType = 'task' | 'HW' | 'CW' | 'Project'
 
-const WS_URL = 'https://silent-speak-tp68.onrender.com/'
+const WS_URL = 'https://silent-speak-tp68.onrender.com'
 
 export function TeacherSession() {
-  const currentUser = useAppStore((s) => s.currentUser)
-  const activeSession = useAppStore((s) => s.activeSession)
-  const captions = useAppStore((s) => s.captions)
-  const addCaption = useAppStore((s) => s.addCaption)
-  const fullCaptionText = useAppStore((s) => s.fullCaptionText)
+  const currentUser    = useAppStore((s) => s.currentUser)
+  const activeSession  = useAppStore((s) => s.activeSession)
+  const captions       = useAppStore((s) => s.captions)
+  const addCaption     = useAppStore((s) => s.addCaption)
+  const fullCaptionText   = useAppStore((s) => s.fullCaptionText)
   const setFullCaptionText = useAppStore((s) => s.setFullCaptionText)
-  const messages = useAppStore((s) => s.messages)
-  const addMessage = useAppStore((s) => s.addMessage)
-  const participants = useAppStore((s) => s.participants)
+  const messages       = useAppStore((s) => s.messages)
+  const addMessage     = useAppStore((s) => s.addMessage)
+  const participants   = useAppStore((s) => s.participants)
   const addParticipant = useAppStore((s) => s.addParticipant)
   const removeParticipant = useAppStore((s) => s.removeParticipant)
-  const setActiveSession = useAppStore((s) => s.setActiveSession)
-  const setCurrentView = useAppStore((s) => s.setCurrentView)
-  const tasks = useAppStore((s) => s.tasks)
-  const addTask = useAppStore((s) => s.addTask)
+  const setActiveSession  = useAppStore((s) => s.setActiveSession)
+  const setCurrentView    = useAppStore((s) => s.setCurrentView)
+  const tasks    = useAppStore((s) => s.tasks)
+  const addTask  = useAppStore((s) => s.addTask)
 
   const socketRef = useRef<Socket | null>(null)
   const [messageInput, setMessageInput] = useState('')
-  const [taskTitle, setTaskTitle] = useState('')
-  const [taskDesc, setTaskDesc] = useState('')
-  const [taskType, setTaskType] = useState<TaskType>('task')
+  const [taskTitle, setTaskTitle]   = useState('')
+  const [taskDesc, setTaskDesc]     = useState('')
+  const [taskType, setTaskType]     = useState<TaskType>('task')
   const [taskDueDate, setTaskDueDate] = useState('')
-  const [isMuted, setIsMuted] = useState(true)
+  const [isMuted, setIsMuted]       = useState(true)
   const [autoScroll, setAutoScroll] = useState(true)
-  const [copied, setCopied] = useState(false)
-  const [showEndDialog, setShowEndDialog] = useState(false)
+  const [copied, setCopied]         = useState(false)
+  const [showEndDialog, setShowEndDialog]   = useState(false)
   const [showTaskDialog, setShowTaskDialog] = useState(false)
-  const [dmTarget, setDmTarget] = useState<string>('')
-  const [dmMessage, setDmMessage] = useState('')
+  const [dmTarget, setDmTarget]     = useState('')
+  const [dmMessage, setDmMessage]   = useState('')
   const [showDmDialog, setShowDmDialog] = useState(false)
-  const [sttLang, setSttLang] = useState('en-US')
+  const [sttLang, setSttLang]       = useState('en-US')
   const [isSttActive, setIsSttActive] = useState(false)
   const [sttInterim, setSttInterim] = useState('')
   const [isConnected, setIsConnected] = useState(false)
 
-  const captionsEndRef = useRef<HTMLDivElement>(null)
-  const recognitionRef = useRef<any>(null)
-
-  // Keep a stable ref to activeSession for use inside socket/STT callbacks
+  const captionsEndRef   = useRef<HTMLDivElement>(null)
+  const recognitionRef   = useRef<any>(null)
   const activeSessionRef = useRef(activeSession)
-  useEffect(() => { activeSessionRef.current = activeSession }, [activeSession])
+  const captionTextRef   = useRef(fullCaptionText)
 
-  // Keep a stable ref to fullCaptionText for sendCaption
-  const fullCaptionTextRef = useRef(fullCaptionText)
-  useEffect(() => { fullCaptionTextRef.current = fullCaptionText }, [fullCaptionText])
+  useEffect(() => { activeSessionRef.current = activeSession }, [activeSession])
+  useEffect(() => { captionTextRef.current = fullCaptionText }, [fullCaptionText])
 
   // Auto-scroll captions
   useEffect(() => {
     if (autoScroll && captionsEndRef.current) {
-      const container = captionsEndRef.current.parentElement
-      if (container) container.scrollTop = container.scrollHeight
+      const c = captionsEndRef.current.parentElement
+      if (c) c.scrollTop = c.scrollHeight
     }
   }, [captions, autoScroll])
 
-  // ─── WebSocket connection ──────────────────────────────────────────────────
+  // ── WebSocket setup ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!activeSession) return
 
-    // Use autoConnect: false so we can set socketRef BEFORE the connect fires
     const socket = io(WS_URL, {
+      transports: ['websocket'],   // skip polling — fixes Render free-tier issues
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
       autoConnect: false,
     })
 
-    // Set ref BEFORE connecting
-    socketRef.current = socket
+    socketRef.current = socket   // set ref BEFORE connecting
 
     socket.on('connect', () => {
-      console.log('Teacher connected:', socket.id)
+      console.log('[Teacher] connected', socket.id)
       setIsConnected(true)
-      // Re-register session on every (re)connect so server keeps socketId fresh
-      const session = activeSessionRef.current
-      if (session) {
+      const s = activeSessionRef.current
+      if (s) {
         socket.emit('create-session', {
-          sessionCode: session.code,
-          teacherName: session.teacherName,
+          sessionCode: s.code,
+          teacherName: s.teacherName,
         })
       }
     })
 
-    socket.on('disconnect', () => setIsConnected(false))
+    socket.on('disconnect', (reason) => {
+      console.log('[Teacher] disconnected', reason)
+      setIsConnected(false)
+    })
 
     socket.on('student-joined', (data: { studentId: string; nickname: string }) => {
       addParticipant(data)
@@ -154,7 +145,6 @@ export function TeacherSession() {
       })
     })
 
-    // Now connect — ref is set, listeners are registered
     socket.connect()
 
     return () => {
@@ -164,71 +154,59 @@ export function TeacherSession() {
     }
   }, [activeSession, addParticipant, removeParticipant, addMessage])
 
-  // ─── Speech-to-Text ────────────────────────────────────────────────────────
-  // Stable ref so the STT onresult callback always calls the latest sendCaption
+  // ── Caption sending ────────────────────────────────────────────────────────
   const sendCaptionRef = useRef<(text: string) => void>(() => {})
 
   const sendCaption = useCallback((text: string) => {
     const socket = socketRef.current
     const session = activeSessionRef.current
-    if (!socket || !session) return
+    if (!socket || !session || !socket.connected) return
 
     const caption = { text, timestamp: Date.now() }
     socket.emit('caption', { sessionCode: session.code, ...caption })
     addCaption(caption)
 
-    const newText = fullCaptionTextRef.current
-      ? fullCaptionTextRef.current + ' ' + text
+    const newText = captionTextRef.current
+      ? captionTextRef.current + ' ' + text
       : text
     setFullCaptionText(newText)
     socket.emit('caption-bulk', { sessionCode: session.code, fullText: newText })
   }, [addCaption, setFullCaptionText])
 
-  // Keep ref in sync with latest sendCaption
   useEffect(() => { sendCaptionRef.current = sendCaption }, [sendCaption])
 
+  // ── Speech-to-Text ─────────────────────────────────────────────────────────
   const startStt = useCallback(() => {
     if (typeof window === 'undefined') return
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognition) return
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SR) { alert('Speech recognition not supported in this browser.'); return }
 
-    const recognition = new SpeechRecognition()
-    recognition.continuous = true
-    recognition.interimResults = true
-    recognition.lang = sttLang
+    const r = new SR()
+    r.continuous = true
+    r.interimResults = true
+    r.lang = sttLang
 
-    recognition.onresult = (event: any) => {
-      let interim = ''
-      let final = ''
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          final += event.results[i][0].transcript
-        } else {
-          interim += event.results[i][0].transcript
-        }
+    r.onresult = (e: any) => {
+      let interim = '', final = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) final += e.results[i][0].transcript
+        else interim += e.results[i][0].transcript
       }
-      if (final) {
-        sendCaptionRef.current(final)
-        setSttInterim('')
-      } else {
-        setSttInterim(interim)
-      }
+      if (final) { sendCaptionRef.current(final); setSttInterim('') }
+      else setSttInterim(interim)
     }
 
-    recognition.onerror = () => setIsSttActive(false)
-
-    recognition.onend = () => {
-      // Auto-restart if we haven't manually stopped
+    r.onerror = () => setIsSttActive(false)
+    r.onend   = () => {
       if (recognitionRef.current) {
-        try { recognition.start() } catch { setIsSttActive(false) }
+        try { r.start() } catch { setIsSttActive(false) }
       } else {
         setIsSttActive(false)
       }
     }
 
-    recognitionRef.current = recognition
-    recognition.start()
+    recognitionRef.current = r
+    r.start()
     setIsSttActive(true)
   }, [sttLang])
 
@@ -244,18 +222,16 @@ export function TeacherSession() {
   const toggleMic = () => {
     const newMuted = !isMuted
     setIsMuted(newMuted)
-    if (socketRef.current && activeSession) {
-      socketRef.current.emit('mic-toggle', {
-        sessionCode: activeSession.code,
-        isMuted: newMuted,
-      })
+    if (socketRef.current?.connected && activeSession) {
+      socketRef.current.emit('mic-toggle', { sessionCode: activeSession.code, isMuted: newMuted })
     }
     newMuted ? stopStt() : startStt()
   }
 
-  // ─── Messaging ─────────────────────────────────────────────────────────────
+  // ── Messages ───────────────────────────────────────────────────────────────
   const sendMessage = () => {
-    if (!messageInput.trim() || !socketRef.current || !activeSession) return
+    const socket = socketRef.current
+    if (!messageInput.trim() || !socket?.connected || !activeSession) return
     const msg = {
       sessionCode: activeSession.code,
       senderId: currentUser?.id || '',
@@ -264,13 +240,14 @@ export function TeacherSession() {
       content: messageInput.trim(),
       type: 'text',
     }
-    socketRef.current.emit('message', msg)
+    socket.emit('message', msg)
     addMessage(msg)
     setMessageInput('')
   }
 
   const sendDirectMessage = () => {
-    if (!dmMessage.trim() || !socketRef.current || !activeSession || !dmTarget) return
+    const socket = socketRef.current
+    if (!dmMessage.trim() || !socket?.connected || !activeSession || !dmTarget) return
     const msg = {
       sessionCode: activeSession.code,
       senderId: currentUser?.id || '',
@@ -280,15 +257,16 @@ export function TeacherSession() {
       recipientId: dmTarget,
       type: 'text',
     }
-    socketRef.current.emit('message', msg)
+    socket.emit('message', msg)
     addMessage(msg)
     setDmMessage('')
     setShowDmDialog(false)
   }
 
-  // ─── Tasks ─────────────────────────────────────────────────────────────────
+  // ── Tasks ──────────────────────────────────────────────────────────────────
   const assignTask = () => {
-    if (!taskTitle.trim() || !socketRef.current || !activeSession) return
+    const socket = socketRef.current
+    if (!taskTitle.trim() || !socket?.connected || !activeSession) return
     const task = {
       id: Date.now().toString(),
       sessionId: activeSession.code,
@@ -300,21 +278,12 @@ export function TeacherSession() {
       status: 'pending',
       createdAt: new Date().toISOString(),
     }
-    socketRef.current.emit('task-assigned', {
+    socket.emit('task-assigned', {
       sessionCode: activeSession.code,
-      task: {
-        id: task.id,
-        title: task.title,
-        description: task.description || '',
-        type: task.type,
-        dueDate: task.dueDate || null,
-      },
+      task: { id: task.id, title: task.title, description: task.description || '', type: task.type, dueDate: task.dueDate || null },
     })
     addTask(task)
-    setTaskTitle('')
-    setTaskDesc('')
-    setTaskType('task')
-    setTaskDueDate('')
+    setTaskTitle(''); setTaskDesc(''); setTaskType('task'); setTaskDueDate('')
     setShowTaskDialog(false)
   }
 
@@ -333,24 +302,20 @@ export function TeacherSession() {
   const copySessionCode = () => {
     if (!activeSession) return
     navigator.clipboard.writeText(activeSession.code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setCopied(true); setTimeout(() => setCopied(false), 2000)
   }
 
   const downloadCaptions = () => {
-    const content = captions
-      .map((c) => `[${new Date(c.timestamp).toLocaleTimeString()}] ${c.text}`)
-      .join('\n')
+    const content = captions.map((c) => `[${new Date(c.timestamp).toLocaleTimeString()}] ${c.text}`).join('\n')
     const blob = new Blob([content], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     a.download = `captions-${activeSession?.code || 'session'}-${new Date().toISOString().slice(0, 10)}.txt`
-    a.click()
-    URL.revokeObjectURL(url)
+    a.click(); URL.revokeObjectURL(url)
   }
 
-  const TASK_TYPE_COLORS: Record<TaskType, string> = {
+  const TASK_COLORS: Record<TaskType, string> = {
     task: 'bg-blue-100 text-blue-700',
     HW: 'bg-amber-100 text-amber-700',
     CW: 'bg-emerald-100 text-emerald-700',
@@ -362,9 +327,7 @@ export function TeacherSession() {
       <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="max-w-md w-full">
           <CardHeader><CardTitle>No Active Session</CardTitle></CardHeader>
-          <CardContent>
-            <Button onClick={() => setCurrentView('role-select')}>Start a Session</Button>
-          </CardContent>
+          <CardContent><Button onClick={() => setCurrentView('role-select')}>Start a Session</Button></CardContent>
         </Card>
       </div>
     )
@@ -377,8 +340,8 @@ export function TeacherSession() {
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold">Teacher Session</h1>
           <div className="flex items-center gap-2">
-            <span className={`inline-block size-2.5 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-400'}`} />
-            <span className="text-sm text-muted-foreground">{isConnected ? 'Live' : 'Connecting...'}</span>
+            <span className={`inline-block size-2.5 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-yellow-400 animate-pulse'}`} />
+            <span className="text-sm text-muted-foreground">{isConnected ? 'Live' : 'Reconnecting...'}</span>
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -396,8 +359,7 @@ export function TeacherSession() {
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="gap-1.5 min-h-[44px]" onClick={copySessionCode}>
-              <Copy className="size-4" />
-              {copied ? 'Copied!' : 'Copy Code'}
+              <Copy className="size-4" />{copied ? 'Copied!' : 'Copy Code'}
             </Button>
             <Badge variant="secondary">{participants.length} student{participants.length !== 1 ? 's' : ''}</Badge>
           </div>
@@ -413,16 +375,13 @@ export function TeacherSession() {
                 Live Captions
                 {isSttActive && (
                   <span className="inline-flex items-center gap-1.5 text-xs text-red-500">
-                    <span className="inline-block size-2 rounded-full bg-red-500 animate-pulse" />
-                    Recording
+                    <span className="inline-block size-2 rounded-full bg-red-500 animate-pulse" />Recording
                   </span>
                 )}
               </CardTitle>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="auto-scroll" className="text-xs">Auto-scroll</Label>
-                  <Switch id="auto-scroll" checked={autoScroll} onCheckedChange={setAutoScroll} />
-                </div>
+                <Label htmlFor="auto-scroll" className="text-xs">Auto-scroll</Label>
+                <Switch id="auto-scroll" checked={autoScroll} onCheckedChange={setAutoScroll} />
                 <Button variant="outline" size="sm" className="gap-1 min-h-[44px]" onClick={downloadCaptions} disabled={captions.length === 0}>
                   <Download className="size-4" />Download
                 </Button>
@@ -432,12 +391,11 @@ export function TeacherSession() {
           <CardContent>
             <div className="min-h-[200px] max-h-[350px] overflow-y-auto rounded-md border p-3 space-y-1">
               {captions.length === 0 ? (
-                <p className="text-muted-foreground text-sm">No captions yet. Turn on your mic to start live captioning, or type captions below.</p>
+                <p className="text-muted-foreground text-sm">No captions yet. Turn on your mic to start, or type below.</p>
               ) : (
                 captions.map((c, i) => (
                   <p key={i} className="text-sm">
-                    <span className="text-muted-foreground text-xs">{new Date(c.timestamp).toLocaleTimeString()}</span>{' '}
-                    {c.text}
+                    <span className="text-muted-foreground text-xs">{new Date(c.timestamp).toLocaleTimeString()}</span>{' '}{c.text}
                   </p>
                 ))
               )}
@@ -449,11 +407,8 @@ export function TeacherSession() {
                 placeholder="Type a caption and press Enter..."
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    const target = e.target as HTMLInputElement
-                    if (target.value.trim()) {
-                      sendCaption(target.value.trim())
-                      target.value = ''
-                    }
+                    const t = e.target as HTMLInputElement
+                    if (t.value.trim()) { sendCaption(t.value.trim()); t.value = '' }
                   }
                 }}
               />
@@ -487,13 +442,12 @@ export function TeacherSession() {
           </CardHeader>
           <CardContent>
             {participants.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No students joined yet. Share the session code!</p>
+              <p className="text-sm text-muted-foreground">No students yet. Share the code!</p>
             ) : (
               <ul className="space-y-1 max-h-48 overflow-y-auto">
                 {participants.map((p) => (
                   <li key={p.studentId} className="text-sm flex items-center gap-2 p-1.5 rounded hover:bg-accent/50">
-                    <span className="inline-block size-2 rounded-full bg-green-400" />
-                    {p.nickname}
+                    <span className="inline-block size-2 rounded-full bg-green-400" />{p.nickname}
                   </li>
                 ))}
               </ul>
@@ -503,18 +457,15 @@ export function TeacherSession() {
 
         {/* Messages */}
         <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Messages</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Messages</CardTitle></CardHeader>
           <CardContent>
             <div className="min-h-[150px] max-h-[250px] overflow-y-auto space-y-2 rounded-md border p-3">
               {messages.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No messages yet</p>
               ) : (
                 messages.map((m, i) => (
-                  <div key={i} className="text-sm">
-                    <span className="font-medium">{m.senderName}:</span>{' '}
-                    {m.content}
+                  <div key={i} className={`text-sm p-1.5 rounded ${m.senderRole === 'teacher' ? 'bg-primary/5' : 'bg-muted/40'}`}>
+                    <span className="font-medium">{m.senderName}:</span>{' '}{m.content}
                     {m.recipientId && <span className="text-xs text-muted-foreground ml-1">(DM)</span>}
                   </div>
                 ))
@@ -522,12 +473,12 @@ export function TeacherSession() {
             </div>
             <div className="flex gap-2 mt-2">
               <Input
-                placeholder="Send a message..."
+                placeholder="Send a message to students..."
                 value={messageInput}
                 onChange={(e) => setMessageInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
               />
-              <Button size="sm" onClick={sendMessage} className="min-h-[44px]" disabled={!isConnected}>
+              <Button size="sm" className="min-h-[44px]" onClick={sendMessage} disabled={!isConnected}>
                 <Send className="size-4" />
               </Button>
             </div>
@@ -553,13 +504,11 @@ export function TeacherSession() {
                   <div key={t.id} className="border rounded p-2.5 text-sm space-y-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium truncate">{t.title}</span>
-                      <Badge className={`text-xs ${TASK_TYPE_COLORS[t.type as TaskType] || 'bg-gray-100 text-gray-700'}`}>{t.type}</Badge>
+                      <Badge className={`text-xs ${TASK_COLORS[t.type as TaskType] || 'bg-gray-100 text-gray-700'}`}>{t.type}</Badge>
                     </div>
                     {t.description && <p className="text-muted-foreground text-xs">{t.description}</p>}
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {t.teacherId === currentUser?.id ? 'Assigned by you' : t.status}
-                      </Badge>
+                      <Badge variant="outline" className="text-xs">{t.teacherId === currentUser?.id ? 'Assigned by you' : t.status}</Badge>
                       {t.dueDate && (
                         <span className="text-xs text-muted-foreground flex items-center gap-1">
                           <Timer className="size-3" />Due: {new Date(t.dueDate).toLocaleDateString()}
@@ -580,7 +529,7 @@ export function TeacherSession() {
           <AlertDialogHeader>
             <AlertDialogTitle>End Session?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will disconnect all {participants.length} student{participants.length !== 1 ? 's' : ''}. Session code <strong>{activeSession.code}</strong> will no longer be valid.
+              This will disconnect all {participants.length} student{participants.length !== 1 ? 's' : ''}. Code <strong>{activeSession.code}</strong> will no longer be valid.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
