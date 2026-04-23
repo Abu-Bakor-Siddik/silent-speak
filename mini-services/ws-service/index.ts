@@ -84,20 +84,23 @@ io.on("connection", (socket) => {
   );
 
   // Teacher sends live caption
-socket.on("caption", (data) => {
-  const session = sessions.get(data.sessionCode);
-  if (!session) return;
+  socket.on("caption", (data) => {
+    const session = sessions.get(data.sessionCode);
+    if (!session) return;
 
-  session.captions.push({
-    text: data.text,
-    timestamp: data.timestamp,
-  });
+    session.captions.push({
+      text: data.text,
+      timestamp: data.timestamp,
+    });
 
-  io.to(data.sessionCode).emit("caption", {
-    text: data.text,
-    timestamp: data.timestamp,
+    // Use socket.to (not io.to) to broadcast to everyone EXCEPT the sender (teacher).
+    // The teacher already adds the caption locally, so re-broadcasting back to them
+    // would cause duplicates.
+    socket.to(data.sessionCode).emit("caption", {
+      text: data.text,
+      timestamp: data.timestamp,
+    });
   });
-});
 
   // Teacher sends bulk captions (for full caption updates)
   socket.on(
@@ -110,12 +113,13 @@ socket.on("caption", (data) => {
   );
 
   // Send message (teacher to students or student to teacher)
+  // Use socket.to (excludes sender) — each side already adds their own message locally.
   socket.on("message", (data) => {
-  const session = sessions.get(data.sessionCode);
-  if (!session) return;
+    const session = sessions.get(data.sessionCode);
+    if (!session) return;
 
-  io.to(data.sessionCode).emit("message", data);
-});
+    socket.to(data.sessionCode).emit("message", data);
+  });
 
   // Quick communication (student sends quick phrase with TTS)
   socket.on(

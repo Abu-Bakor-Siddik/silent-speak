@@ -40,19 +40,18 @@ import {
   Download,
   Send,
   Plus,
-  X,
-  ChevronDown,
   Timer,
 } from 'lucide-react'
 
 type TaskType = 'task' | 'HW' | 'CW' | 'Project'
+
+const WS_URL = 'https://silent-speak-tp68.onrender.com/'
 
 export function TeacherSession() {
   const currentUser = useAppStore((s) => s.currentUser)
   const activeSession = useAppStore((s) => s.activeSession)
   const captions = useAppStore((s) => s.captions)
   const addCaption = useAppStore((s) => s.addCaption)
-  const clearCaptions = useAppStore((s) => s.clearCaptions)
   const fullCaptionText = useAppStore((s) => s.fullCaptionText)
   const setFullCaptionText = useAppStore((s) => s.setFullCaptionText)
   const messages = useAppStore((s) => s.messages)
@@ -64,7 +63,6 @@ export function TeacherSession() {
   const setCurrentView = useAppStore((s) => s.setCurrentView)
   const tasks = useAppStore((s) => s.tasks)
   const addTask = useAppStore((s) => s.addTask)
-  const updateTask = useAppStore((s) => s.updateTask)
 
   const socketRef = useRef<Socket | null>(null)
   const [messageInput, setMessageInput] = useState('')
@@ -83,38 +81,56 @@ export function TeacherSession() {
   const [sttLang, setSttLang] = useState('en-US')
   const [isSttActive, setIsSttActive] = useState(false)
   const [sttInterim, setSttInterim] = useState('')
+  const [isConnected, setIsConnected] = useState(false)
 
   const captionsEndRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<any>(null)
 
-  // Auto-scroll effect - only scroll the caption container, not the whole page
+  // Keep a stable ref to activeSession for use inside socket/STT callbacks
+  const activeSessionRef = useRef(activeSession)
+  useEffect(() => { activeSessionRef.current = activeSession }, [activeSession])
+
+  // Keep a stable ref to fullCaptionText for sendCaption
+  const fullCaptionTextRef = useRef(fullCaptionText)
+  useEffect(() => { fullCaptionTextRef.current = fullCaptionText }, [fullCaptionText])
+
+  // Auto-scroll captions
   useEffect(() => {
     if (autoScroll && captionsEndRef.current) {
       const container = captionsEndRef.current.parentElement
-      if (container) {
-        container.scrollTop = container.scrollHeight
-      }
+      if (container) container.scrollTop = container.scrollHeight
     }
   }, [captions, autoScroll])
 
-  // WebSocket connection
+  // ─── WebSocket connection ──────────────────────────────────────────────────
   useEffect(() => {
     if (!activeSession) return
- 
-    const socket = io('https://silent-speak-tp68.onrender.com/', {
-  reconnection: true,
-  reconnectionAttempts: 10,
-  reconnectionDelay: 1000,
-})
-socket.on("connect", () => {
-  console.log("Teacher reconnected")
 
-  socket.emit("create-session", {
-    sessionCode: activeSession.code,
-    teacherName: activeSession.teacherName,
-  })
-})
+    // Use autoConnect: false so we can set socketRef BEFORE the connect fires
+    const socket = io(WS_URL, {
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      autoConnect: false,
+    })
+
+    // Set ref BEFORE connecting
     socketRef.current = socket
+
+    socket.on('connect', () => {
+      console.log('Teacher connected:', socket.id)
+      setIsConnected(true)
+      // Re-register session on every (re)connect so server keeps socketId fresh
+      const session = activeSessionRef.current
+      if (session) {
+        socket.emit('create-session', {
+          sessionCode: session.code,
+          teacherName: session.teacherName,
+        })
+      }
+    })
+
+    socket.on('disconnect', () => setIsConnected(false))
 
     socket.on('student-joined', (data: { studentId: string; nickname: string }) => {
       addParticipant(data)
@@ -138,19 +154,43 @@ socket.on("connect", () => {
       })
     })
 
+    // Now connect — ref is set, listeners are registered
+    socket.connect()
+
     return () => {
       socket.disconnect()
       socketRef.current = null
+      setIsConnected(false)
     }
   }, [activeSession, addParticipant, removeParticipant, addMessage])
 
-  // Stable ref for sendCaption to avoid access-before-declaration
+  // ─── Speech-to-Text ────────────────────────────────────────────────────────
+  // Stable ref so the STT onresult callback always calls the latest sendCaption
   const sendCaptionRef = useRef<(text: string) => void>(() => {})
 
-  // Web Speech API for built-in STT
+  const sendCaption = useCallback((text: string) => {
+    const socket = socketRef.current
+    const session = activeSessionRef.current
+    if (!socket || !session) return
+
+    const caption = { text, timestamp: Date.now() }
+    socket.emit('caption', { sessionCode: session.code, ...caption })
+    addCaption(caption)
+
+    const newText = fullCaptionTextRef.current
+      ? fullCaptionTextRef.current + ' ' + text
+      : text
+    setFullCaptionText(newText)
+    socket.emit('caption-bulk', { sessionCode: session.code, fullText: newText })
+  }, [addCaption, setFullCaptionText])
+
+  // Keep ref in sync with latest sendCaption
+  useEffect(() => { sendCaptionRef.current = sendCaption }, [sendCaption])
+
   const startStt = useCallback(() => {
     if (typeof window === 'undefined') return
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SpeechRecognition) return
 
     const recognition = new SpeechRecognition()
@@ -176,18 +216,12 @@ socket.on("connect", () => {
       }
     }
 
-    recognition.onerror = () => {
-      setIsSttActive(false)
-    }
+    recognition.onerror = () => setIsSttActive(false)
 
     recognition.onend = () => {
-      // Restart if still active
-      if (isSttActive && recognitionRef.current) {
-        try {
-          recognition.start()
-        } catch {
-          setIsSttActive(false)
-        }
+      // Auto-restart if we haven't manually stopped
+      if (recognitionRef.current) {
+        try { recognition.start() } catch { setIsSttActive(false) }
       } else {
         setIsSttActive(false)
       }
@@ -196,7 +230,7 @@ socket.on("connect", () => {
     recognitionRef.current = recognition
     recognition.start()
     setIsSttActive(true)
-  }, [sttLang, isSttActive])
+  }, [sttLang])
 
   const stopStt = useCallback(() => {
     if (recognitionRef.current) {
@@ -207,7 +241,6 @@ socket.on("connect", () => {
     setSttInterim('')
   }, [])
 
-  // Toggle mic with STT
   const toggleMic = () => {
     const newMuted = !isMuted
     setIsMuted(newMuted)
@@ -217,13 +250,10 @@ socket.on("connect", () => {
         isMuted: newMuted,
       })
     }
-    if (newMuted) {
-      stopStt()
-    } else {
-      startStt()
-    }
+    newMuted ? stopStt() : startStt()
   }
 
+  // ─── Messaging ─────────────────────────────────────────────────────────────
   const sendMessage = () => {
     if (!messageInput.trim() || !socketRef.current || !activeSession) return
     const msg = {
@@ -251,32 +281,12 @@ socket.on("connect", () => {
       type: 'text',
     }
     socketRef.current.emit('message', msg)
-    setDmMessage('')
     addMessage(msg)
+    setDmMessage('')
     setShowDmDialog(false)
   }
 
-  const sendCaption = (text: string) => {
-    if (!socketRef.current || !activeSession) return
-    const caption = { text, timestamp: Date.now() }
-    socketRef.current.emit('caption', {
-      sessionCode: activeSession.code,
-      ...caption,
-    })
-    addCaption(caption)
-    const newText = fullCaptionText + ' ' + text
-    setFullCaptionText(newText)
-    socketRef.current.emit('caption-bulk', {
-      sessionCode: activeSession.code,
-      fullText: newText,
-    })
-  }
-
-  // Keep sendCaptionRef in sync so STT callback always uses the latest version
-  useEffect(() => {
-    sendCaptionRef.current = sendCaption
-  })
-
+  // ─── Tasks ─────────────────────────────────────────────────────────────────
   const assignTask = () => {
     if (!taskTitle.trim() || !socketRef.current || !activeSession) return
     const task = {
@@ -351,13 +361,9 @@ socket.on("connect", () => {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="max-w-md w-full">
-          <CardHeader>
-            <CardTitle>No Active Session</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>No Active Session</CardTitle></CardHeader>
           <CardContent>
-            <Button onClick={() => setCurrentView('role-select')}>
-              Start a Session
-            </Button>
+            <Button onClick={() => setCurrentView('role-select')}>Start a Session</Button>
           </CardContent>
         </Card>
       </div>
@@ -371,21 +377,17 @@ socket.on("connect", () => {
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold">Teacher Session</h1>
           <div className="flex items-center gap-2">
-            <span className="inline-block size-2.5 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-sm text-muted-foreground">Live</span>
+            <span className={`inline-block size-2.5 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-400'}`} />
+            <span className="text-sm text-muted-foreground">{isConnected ? 'Live' : 'Connecting...'}</span>
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => setCurrentView('dashboard')}>
-            Dashboard
-          </Button>
-          <Button variant="destructive" size="sm" onClick={() => setShowEndDialog(true)}>
-            End Session
-          </Button>
+          <Button variant="outline" size="sm" onClick={() => setCurrentView('dashboard')}>Dashboard</Button>
+          <Button variant="destructive" size="sm" onClick={() => setShowEndDialog(true)}>End Session</Button>
         </div>
       </div>
 
-      {/* Session Code Display */}
+      {/* Session Code */}
       <Card className="border-primary/30 bg-primary/5">
         <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
           <div>
@@ -393,12 +395,7 @@ socket.on("connect", () => {
             <p className="text-3xl font-bold tracking-widest font-mono">{activeSession.code}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 min-h-[44px]"
-              onClick={copySessionCode}
-            >
+            <Button variant="outline" size="sm" className="gap-1.5 min-h-[44px]" onClick={copySessionCode}>
               <Copy className="size-4" />
               {copied ? 'Copied!' : 'Copy Code'}
             </Button>
@@ -424,21 +421,10 @@ socket.on("connect", () => {
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="auto-scroll" className="text-xs">Auto-scroll</Label>
-                  <Switch
-                    id="auto-scroll"
-                    checked={autoScroll}
-                    onCheckedChange={setAutoScroll}
-                  />
+                  <Switch id="auto-scroll" checked={autoScroll} onCheckedChange={setAutoScroll} />
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1 min-h-[44px]"
-                  onClick={downloadCaptions}
-                  disabled={captions.length === 0}
-                >
-                  <Download className="size-4" />
-                  Download
+                <Button variant="outline" size="sm" className="gap-1 min-h-[44px]" onClick={downloadCaptions} disabled={captions.length === 0}>
+                  <Download className="size-4" />Download
                 </Button>
               </div>
             </div>
@@ -446,29 +432,21 @@ socket.on("connect", () => {
           <CardContent>
             <div className="min-h-[200px] max-h-[350px] overflow-y-auto rounded-md border p-3 space-y-1">
               {captions.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  No captions yet. Turn on your mic to start live captioning, or type captions below.
-                </p>
+                <p className="text-muted-foreground text-sm">No captions yet. Turn on your mic to start live captioning, or type captions below.</p>
               ) : (
                 captions.map((c, i) => (
                   <p key={i} className="text-sm">
-                    <span className="text-muted-foreground text-xs">
-                      {new Date(c.timestamp).toLocaleTimeString()}
-                    </span>{' '}
+                    <span className="text-muted-foreground text-xs">{new Date(c.timestamp).toLocaleTimeString()}</span>{' '}
                     {c.text}
                   </p>
                 ))
               )}
-              {sttInterim && (
-                <p className="text-sm text-muted-foreground italic">
-                  {sttInterim}
-                </p>
-              )}
+              {sttInterim && <p className="text-sm text-muted-foreground italic">{sttInterim}</p>}
               <div ref={captionsEndRef} />
             </div>
             <div className="flex gap-2 mt-2">
               <Input
-                placeholder="Type a caption..."
+                placeholder="Type a caption and press Enter..."
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     const target = e.target as HTMLInputElement
@@ -481,19 +459,12 @@ socket.on("connect", () => {
               />
             </div>
             <div className="flex items-center gap-2 mt-3 flex-wrap">
-              <Button
-                variant={isMuted ? 'default' : 'destructive'}
-                size="sm"
-                className="gap-1.5 min-h-[44px]"
-                onClick={toggleMic}
-              >
+              <Button variant={isMuted ? 'default' : 'destructive'} size="sm" className="gap-1.5 min-h-[44px]" onClick={toggleMic}>
                 {isMuted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
                 {isMuted ? 'Start Mic (STT)' : 'Stop Mic'}
               </Button>
-              <Select value={sttLang} onValueChange={(v) => { setSttLang(v); if (isSttActive) { stopStt(); } }}>
-                <SelectTrigger className="w-[140px] min-h-[44px]">
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={sttLang} onValueChange={(v) => { setSttLang(v); if (isSttActive) stopStt() }}>
+                <SelectTrigger className="w-[140px] min-h-[44px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="en-US">English (US)</SelectItem>
                   <SelectItem value="en-GB">English (UK)</SelectItem>
@@ -509,15 +480,8 @@ socket.on("connect", () => {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Students ({participants.length})</CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1 min-h-[44px]"
-                onClick={() => setShowDmDialog(true)}
-                disabled={participants.length === 0}
-              >
-                <Send className="size-3.5" />
-                DM
+              <Button variant="outline" size="sm" className="gap-1 min-h-[44px]" onClick={() => setShowDmDialog(true)} disabled={participants.length === 0}>
+                <Send className="size-3.5" />DM
               </Button>
             </div>
           </CardHeader>
@@ -551,9 +515,7 @@ socket.on("connect", () => {
                   <div key={i} className="text-sm">
                     <span className="font-medium">{m.senderName}:</span>{' '}
                     {m.content}
-                    {m.recipientId && (
-                      <span className="text-xs text-muted-foreground ml-1">(DM)</span>
-                    )}
+                    {m.recipientId && <span className="text-xs text-muted-foreground ml-1">(DM)</span>}
                   </div>
                 ))
               )}
@@ -565,7 +527,7 @@ socket.on("connect", () => {
                 onChange={(e) => setMessageInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
               />
-              <Button size="sm" onClick={sendMessage} className="min-h-[44px]">
+              <Button size="sm" onClick={sendMessage} className="min-h-[44px]" disabled={!isConnected}>
                 <Send className="size-4" />
               </Button>
             </div>
@@ -577,14 +539,8 @@ socket.on("connect", () => {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Tasks ({tasks.length})</CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1 min-h-[44px]"
-                onClick={() => setShowTaskDialog(true)}
-              >
-                <Plus className="size-3.5" />
-                Add
+              <Button variant="outline" size="sm" className="gap-1 min-h-[44px]" onClick={() => setShowTaskDialog(true)}>
+                <Plus className="size-3.5" />Add
               </Button>
             </div>
           </CardHeader>
@@ -597,21 +553,16 @@ socket.on("connect", () => {
                   <div key={t.id} className="border rounded p-2.5 text-sm space-y-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium truncate">{t.title}</span>
-                      <Badge className={`text-xs ${TASK_TYPE_COLORS[t.type as TaskType] || 'bg-gray-100 text-gray-700'}`}>
-                        {t.type}
-                      </Badge>
+                      <Badge className={`text-xs ${TASK_TYPE_COLORS[t.type as TaskType] || 'bg-gray-100 text-gray-700'}`}>{t.type}</Badge>
                     </div>
-                    {t.description && (
-                      <p className="text-muted-foreground text-xs">{t.description}</p>
-                    )}
+                    {t.description && <p className="text-muted-foreground text-xs">{t.description}</p>}
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="text-xs">
                         {t.teacherId === currentUser?.id ? 'Assigned by you' : t.status}
                       </Badge>
                       {t.dueDate && (
                         <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Timer className="size-3" />
-                          Due: {new Date(t.dueDate).toLocaleDateString()}
+                          <Timer className="size-3" />Due: {new Date(t.dueDate).toLocaleDateString()}
                         </span>
                       )}
                     </div>
@@ -623,55 +574,39 @@ socket.on("connect", () => {
         </Card>
       </div>
 
-      {/* End Session Confirmation Dialog */}
+      {/* Dialogs */}
       <AlertDialog open={showEndDialog} onOpenChange={setShowEndDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>End Session?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will end the session for all {participants.length} student{participants.length !== 1 ? 's' : ''}. All participants will be disconnected and the session code <strong>{activeSession.code}</strong> will no longer be valid.
+              This will disconnect all {participants.length} student{participants.length !== 1 ? 's' : ''}. Session code <strong>{activeSession.code}</strong> will no longer be valid.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={endSession} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              End Session
-            </AlertDialogAction>
+            <AlertDialogAction onClick={endSession} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">End Session</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Assign Task Dialog */}
       <Dialog open={showTaskDialog} onOpenChange={setShowTaskDialog}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Assign Task</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Assign Task</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Task Title</Label>
-              <Input
-                placeholder="e.g., Read Chapter 5"
-                value={taskTitle}
-                onChange={(e) => setTaskTitle(e.target.value)}
-              />
+              <Input placeholder="e.g., Read Chapter 5" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label>Description (optional)</Label>
-              <Textarea
-                placeholder="Describe the task..."
-                value={taskDesc}
-                onChange={(e) => setTaskDesc(e.target.value)}
-                rows={3}
-              />
+              <Textarea placeholder="Describe the task..." value={taskDesc} onChange={(e) => setTaskDesc(e.target.value)} rows={3} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Type</Label>
                 <Select value={taskType} onValueChange={(v) => setTaskType(v as TaskType)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="task">Task</SelectItem>
                     <SelectItem value="HW">Homework</SelectItem>
@@ -682,43 +617,28 @@ socket.on("connect", () => {
               </div>
               <div className="space-y-2">
                 <Label>Due Date (optional)</Label>
-                <Input
-                  type="date"
-                  value={taskDueDate}
-                  onChange={(e) => setTaskDueDate(e.target.value)}
-                />
+                <Input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} />
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowTaskDialog(false)}>
-                Cancel
-              </Button>
-              <Button onClick={assignTask} disabled={!taskTitle.trim()}>
-                Assign Task
-              </Button>
+              <Button variant="outline" onClick={() => setShowTaskDialog(false)}>Cancel</Button>
+              <Button onClick={assignTask} disabled={!taskTitle.trim()}>Assign Task</Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Direct Message Dialog */}
       <Dialog open={showDmDialog} onOpenChange={setShowDmDialog}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Send Direct Message</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Send Direct Message</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Send to</Label>
               <Select value={dmTarget} onValueChange={setDmTarget}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a student" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select a student" /></SelectTrigger>
                 <SelectContent>
                   {participants.map((p) => (
-                    <SelectItem key={p.studentId} value={p.studentId}>
-                      {p.nickname}
-                    </SelectItem>
+                    <SelectItem key={p.studentId} value={p.studentId}>{p.nickname}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -730,21 +650,13 @@ socket.on("connect", () => {
                 value={dmMessage}
                 onChange={(e) => setDmMessage(e.target.value)}
                 rows={3}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    sendDirectMessage()
-                  }
-                }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendDirectMessage() } }}
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowDmDialog(false)}>
-                Cancel
-              </Button>
+              <Button variant="outline" onClick={() => setShowDmDialog(false)}>Cancel</Button>
               <Button onClick={sendDirectMessage} disabled={!dmMessage.trim() || !dmTarget}>
-                <Send className="size-4 mr-1.5" />
-                Send
+                <Send className="size-4 mr-1.5" />Send
               </Button>
             </div>
           </div>

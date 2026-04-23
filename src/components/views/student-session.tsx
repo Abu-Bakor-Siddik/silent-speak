@@ -24,9 +24,11 @@ import {
   Save,
   Volume2,
   LogOut,
-  CheckCircle,
   AlertTriangle,
+  Send,
 } from 'lucide-react'
+
+const WS_URL = 'https://silent-speak-tp68.onrender.com/'
 
 export function StudentSession() {
   const currentUser = useAppStore((s) => s.currentUser)
@@ -50,36 +52,54 @@ export function StudentSession() {
   const [enhancedText, setEnhancedText] = useState('')
   const [saving, setSaving] = useState(false)
   const [sessionEnded, setSessionEnded] = useState(false)
+  const [isConnected, setIsConnected] = useState(false)
   const captionsEndRef = useRef<HTMLDivElement>(null)
 
-  // Auto-scroll effect - only scroll the caption container, not the whole page
+  // Stable refs for use inside socket callbacks
+  const activeSessionRef = useRef(activeSession)
+  useEffect(() => { activeSessionRef.current = activeSession }, [activeSession])
+  const currentUserRef = useRef(currentUser)
+  useEffect(() => { currentUserRef.current = currentUser }, [currentUser])
+
+  // Auto-scroll
   useEffect(() => {
     if (autoScroll && captionsEndRef.current) {
       const container = captionsEndRef.current.parentElement
-      if (container) {
-        container.scrollTop = container.scrollHeight
-      }
+      if (container) container.scrollTop = container.scrollHeight
     }
   }, [captions, autoScroll])
 
+  // ─── WebSocket connection ──────────────────────────────────────────────────
   useEffect(() => {
     if (!activeSession || !currentUser) return
 
-    const socket = io('https://silent-speak-tp68.onrender.com/', {
-  reconnection: true,
-  reconnectionAttempts: 10,
-  reconnectionDelay: 1000,
-})
-socket.on("connect", () => {
-  console.log("Reconnected")
+    // Use autoConnect: false so we can set socketRef BEFORE the connect fires
+    const socket = io(WS_URL, {
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      autoConnect: false,
+    })
 
-  socket.emit("join-session", {
-    sessionCode: activeSession.code,
-    studentId: currentUser.id,
-    nickname: currentUser.nickname || currentUser.name,
-  })
-})
+    // Set ref BEFORE connecting
     socketRef.current = socket
+
+    socket.on('connect', () => {
+      console.log('Student connected:', socket.id)
+      setIsConnected(true)
+      // Re-join session on every (re)connect
+      const session = activeSessionRef.current
+      const user = currentUserRef.current
+      if (session && user) {
+        socket.emit('join-session', {
+          sessionCode: session.code,
+          studentId: user.id,
+          nickname: user.nickname || user.name,
+        })
+      }
+    })
+
+    socket.on('disconnect', () => setIsConnected(false))
 
     socket.on('caption', (data: { text: string; timestamp: number }) => {
       addCaption(data)
@@ -99,9 +119,10 @@ socket.on("connect", () => {
     })
 
     socket.on('task-assigned', (task: any) => {
+      const session = activeSessionRef.current
       addTask({
         id: task.id,
-        sessionId: activeSession.code,
+        sessionId: session?.code || '',
         teacherId: '',
         title: task.title,
         description: task.description,
@@ -116,17 +137,26 @@ socket.on("connect", () => {
       setSessionEnded(true)
     })
 
+    // Now connect
+    socket.connect()
+
     return () => {
-      socket.emit('leave-session', {
-        sessionCode: activeSession.code,
-        userId: currentUser.id,
-        role: 'student',
-      })
+      const session = activeSessionRef.current
+      const user = currentUserRef.current
+      if (session && user) {
+        socket.emit('leave-session', {
+          sessionCode: session.code,
+          userId: user.id,
+          role: 'student',
+        })
+      }
       socket.disconnect()
       socketRef.current = null
+      setIsConnected(false)
     }
   }, [activeSession, currentUser, addCaption, clearCaptions, setFullCaptionText, addMessage, addTask])
 
+  // ─── Messaging ─────────────────────────────────────────────────────────────
   const sendMessage = () => {
     if (!messageInput.trim() || !socketRef.current || !activeSession) return
     const msg = {
@@ -145,7 +175,6 @@ socket.on("connect", () => {
   const sendQuickComm = (phrase: string) => {
     if (!socketRef.current || !activeSession) return
 
-    // Also speak the phrase aloud on the student's device using TTS
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel()
       const cleanPhrase = phrase.replace(/[^\w\s.,!?']/g, '').trim()
@@ -195,11 +224,9 @@ socket.on("connect", () => {
         body: JSON.stringify({ text: textToEnhance }),
       })
       const data = await res.json()
-      if (res.ok && data.enhanced) {
-        setEnhancedText(data.enhanced)
-      }
+      if (res.ok && data.enhanced) setEnhancedText(data.enhanced)
     } catch {
-      // error
+      // silent
     } finally {
       setEnhancing(false)
     }
@@ -224,7 +251,7 @@ socket.on("connect", () => {
         }),
       })
     } catch {
-      // error
+      // silent
     } finally {
       setSaving(false)
     }
@@ -246,41 +273,26 @@ socket.on("connect", () => {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="max-w-md w-full">
-          <CardHeader>
-            <CardTitle>No Active Session</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>No Active Session</CardTitle></CardHeader>
           <CardContent>
-            <Button onClick={() => setCurrentView('role-select')}>
-              Join a Session
-            </Button>
+            <Button onClick={() => setCurrentView('role-select')}>Join a Session</Button>
           </CardContent>
         </Card>
       </div>
     )
   }
 
-  // Session ended overlay
   if (sessionEnded) {
     return (
       <div className="flex items-center justify-center min-h-[70vh] px-4">
         <Card className="max-w-md w-full text-center">
           <CardHeader>
-            <div className="mx-auto mb-2">
-              <AlertTriangle className="size-12 text-amber-500" />
-            </div>
+            <div className="mx-auto mb-2"><AlertTriangle className="size-12 text-amber-500" /></div>
             <CardTitle className="text-xl">Session Ended</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-muted-foreground">
-              The teacher has ended this session. You will be redirected to the dashboard.
-            </p>
-            <Button
-              onClick={() => {
-                setActiveSession(null)
-                setCurrentView('dashboard')
-              }}
-              className="min-h-[44px]"
-            >
+            <p className="text-muted-foreground">The teacher has ended this session.</p>
+            <Button onClick={() => { setActiveSession(null); setCurrentView('dashboard') }} className="min-h-[44px]">
               Go to Dashboard
             </Button>
           </CardContent>
@@ -296,16 +308,10 @@ socket.on("connect", () => {
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-bold">Student Session</h1>
           <Badge variant="secondary" className="font-mono">{activeSession.code}</Badge>
-          <span className="inline-block size-2.5 rounded-full bg-green-500 animate-pulse" />
+          <span className={`inline-block size-2.5 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-400'}`} />
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5 min-h-[44px]"
-          onClick={handleLeaveSession}
-        >
-          <LogOut className="size-4" />
-          Leave Session
+        <Button variant="outline" size="sm" className="gap-1.5 min-h-[44px]" onClick={handleLeaveSession}>
+          <LogOut className="size-4" />Leave Session
         </Button>
       </div>
 
@@ -318,21 +324,10 @@ socket.on("connect", () => {
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="student-auto-scroll" className="text-xs">Auto-scroll</Label>
-                  <Switch
-                    id="student-auto-scroll"
-                    checked={autoScroll}
-                    onCheckedChange={setAutoScroll}
-                  />
+                  <Switch id="student-auto-scroll" checked={autoScroll} onCheckedChange={setAutoScroll} />
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1 min-h-[44px]"
-                  onClick={downloadCaptions}
-                  disabled={captions.length === 0}
-                >
-                  <Download className="size-3.5" />
-                  Download
+                <Button variant="outline" size="sm" className="gap-1 min-h-[44px]" onClick={downloadCaptions} disabled={captions.length === 0}>
+                  <Download className="size-3.5" />Download
                 </Button>
               </div>
             </div>
@@ -340,13 +335,13 @@ socket.on("connect", () => {
           <CardContent>
             <div className="min-h-[200px] max-h-[400px] overflow-y-auto rounded-md border p-3 space-y-1">
               {captions.length === 0 ? (
-                <p className="text-muted-foreground text-sm">Waiting for teacher to start captions...</p>
+                <p className="text-muted-foreground text-sm">
+                  {isConnected ? 'Waiting for teacher to start captions...' : 'Connecting to session...'}
+                </p>
               ) : (
                 captions.map((c, i) => (
                   <p key={i} className="text-sm">
-                    <span className="text-muted-foreground text-xs">
-                      {new Date(c.timestamp).toLocaleTimeString()}
-                    </span>{' '}
+                    <span className="text-muted-foreground text-xs">{new Date(c.timestamp).toLocaleTimeString()}</span>{' '}
                     {c.text}
                   </p>
                 ))
@@ -354,50 +349,24 @@ socket.on("connect", () => {
               <div ref={captionsEndRef} />
             </div>
 
-            {/* AI Enhanced Notes Display */}
             {enhancedText && (
               <div className="mt-3 rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-medium flex items-center gap-1.5">
-                    <Sparkles className="size-4 text-primary" />
-                    AI-Enhanced Notes
+                    <Sparkles className="size-4 text-primary" />AI-Enhanced Notes
                   </h4>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 text-xs"
-                    onClick={() => setEnhancedText('')}
-                  > 
-                    Dismiss
-                  </Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setEnhancedText('')}>Dismiss</Button>
                 </div>
-                <div className="text-sm whitespace-pre-wrap max-h-64 overflow-y-auto">
-                  {enhancedText}
-                </div>
+                <div className="text-sm whitespace-pre-wrap max-h-64 overflow-y-auto">{enhancedText}</div>
               </div>
             )}
 
-            {/* Action buttons */}
             <div className="flex flex-wrap gap-2 mt-3">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 min-h-[44px]"
-                onClick={enhanceWithAI}
-                disabled={enhancing || captions.length === 0}
-              >
-                <Sparkles className="size-4" />
-                {enhancing ? 'Enhancing...' : 'AI Enhance'}
+              <Button variant="outline" size="sm" className="gap-1.5 min-h-[44px]" onClick={enhanceWithAI} disabled={enhancing || captions.length === 0}>
+                <Sparkles className="size-4" />{enhancing ? 'Enhancing...' : 'AI Enhance'}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 min-h-[44px]"
-                onClick={saveAsNote}
-                disabled={saving || captions.length === 0}
-              >
-                <Save className="size-4" />
-                {saving ? 'Saving...' : 'Save as Note'}
+              <Button variant="outline" size="sm" className="gap-1.5 min-h-[44px]" onClick={saveAsNote} disabled={saving || captions.length === 0}>
+                <Save className="size-4" />{saving ? 'Saving...' : 'Save as Note'}
               </Button>
             </div>
           </CardContent>
@@ -407,8 +376,7 @@ socket.on("connect", () => {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-1.5">
-              <Volume2 className="size-4" />
-              Quick Communication
+              <Volume2 className="size-4" />Quick Communication
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -434,12 +402,7 @@ socket.on("connect", () => {
                 </Button>
               ))}
             </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="w-full mt-2 min-h-[44px]"
-              onClick={() => setCurrentView('quick-communication')}
-            >
+            <Button variant="secondary" size="sm" className="w-full mt-2 min-h-[44px]" onClick={() => setCurrentView('quick-communication')}>
               More Phrases
             </Button>
           </CardContent>
@@ -472,8 +435,8 @@ socket.on("connect", () => {
                 onChange={(e) => setMessageInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
               />
-              <Button size="sm" onClick={sendMessage} className="min-h-[44px]">
-                Send
+              <Button size="sm" onClick={sendMessage} className="min-h-[44px]" disabled={!isConnected}>
+                <Send className="size-4" />
               </Button>
             </div>
           </CardContent>
@@ -493,20 +456,12 @@ socket.on("connect", () => {
                   <div key={t.id} className="border rounded p-2.5 text-sm space-y-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium truncate">{t.title}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {t.type}
-                      </Badge>
+                      <Badge variant="outline" className="text-xs">{t.type}</Badge>
                     </div>
-                    {t.description && (
-                      <p className="text-muted-foreground text-xs">{t.description}</p>
-                    )}
+                    {t.description && <p className="text-muted-foreground text-xs">{t.description}</p>}
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="text-xs">{t.status}</Badge>
-                      {t.dueDate && (
-                        <span className="text-xs text-muted-foreground">
-                          Due: {new Date(t.dueDate).toLocaleDateString()}
-                        </span>
-                      )}
+                      {t.dueDate && <span className="text-xs text-muted-foreground">Due: {new Date(t.dueDate).toLocaleDateString()}</span>}
                     </div>
                   </div>
                 ))}
