@@ -37,7 +37,7 @@ import { Mic, MicOff, Copy, Download, Send, Plus, Timer } from 'lucide-react'
 
 type TaskType = 'task' | 'HW' | 'CW' | 'Project'
 
-const WS_URL = 'https://silent-speak-tp68.onrender.com'
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'https://silent-speak-tp68.onrender.com'
 
 export function TeacherSession() {
   const currentUser    = useAppStore((s) => s.currentUser)

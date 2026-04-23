@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch'
 import { useAppStore } from '@/store/app-store'
 import { Download, Sparkles, Save, Volume2, LogOut, AlertTriangle, Send } from 'lucide-react'
 
-const WS_URL = 'https://silent-speak-tp68.onrender.com'
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'https://silent-speak-tp68.onrender.com'
 
 export function StudentSession() {
   const currentUser    = useAppStore((s) => s.currentUser)
