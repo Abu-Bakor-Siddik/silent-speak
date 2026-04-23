@@ -65,14 +65,21 @@ export function StudentSession() {
   useEffect(() => {
     if (!activeSession || !currentUser) return
 
-    const socket = io('https://silent-speak-tp68.onrender.com/')
-    socketRef.current = socket
+    const socket = io('https://silent-speak-tp68.onrender.com/', {
+  reconnection: true,
+  reconnectionAttempts: 10,
+  reconnectionDelay: 1000,
+})
+socket.on("connect", () => {
+  console.log("Reconnected")
 
-    socket.emit('join-session', {
-      sessionCode: activeSession.code,
-      studentId: currentUser.id,
-      nickname: currentUser.nickname || currentUser.name || currentUser.email,
-    })
+  socket.emit("join-session", {
+    sessionCode: activeSession.code,
+    studentId: currentUser.id,
+    nickname: currentUser.nickname || currentUser.name,
+  })
+})
+    socketRef.current = socket
 
     socket.on('caption', (data: { text: string; timestamp: number }) => {
       addCaption(data)
@@ -131,6 +138,7 @@ export function StudentSession() {
       type: 'text',
     }
     socketRef.current.emit('message', msg)
+    addMessage(msg)
     setMessageInput('')
   }
 

@@ -101,13 +101,20 @@ export function TeacherSession() {
   useEffect(() => {
     if (!activeSession) return
  
-    const socket = io('https://silent-speak-tp68.onrender.com/')
-    socketRef.current = socket
+    const socket = io('https://silent-speak-tp68.onrender.com/', {
+  reconnection: true,
+  reconnectionAttempts: 10,
+  reconnectionDelay: 1000,
+})
+socket.on("connect", () => {
+  console.log("Teacher reconnected")
 
-    socket.emit('create-session', {
-      sessionCode: activeSession.code,
-      teacherName: activeSession.teacherName,
-    })
+  socket.emit("create-session", {
+    sessionCode: activeSession.code,
+    teacherName: activeSession.teacherName,
+  })
+})
+    socketRef.current = socket
 
     socket.on('student-joined', (data: { studentId: string; nickname: string }) => {
       addParticipant(data)
@@ -228,6 +235,7 @@ export function TeacherSession() {
       type: 'text',
     }
     socketRef.current.emit('message', msg)
+    addMessage(msg)
     setMessageInput('')
   }
 
@@ -244,6 +252,7 @@ export function TeacherSession() {
     }
     socketRef.current.emit('message', msg)
     setDmMessage('')
+    addMessage(msg)
     setShowDmDialog(false)
   }
 

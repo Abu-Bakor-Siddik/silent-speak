@@ -73,11 +73,9 @@ io.on("connection", (socket) => {
       });
 
       // Send existing captions to student
-      socket.join(data.sessionCode);
 
-      setTimeout(() => {
-        socket.emit("caption-history", session.captions);
-      }, 200);
+
+      socket.emit("caption-history", session.captions);
 
       console.log(
         `Student ${data.nickname} joined session ${data.sessionCode}`
