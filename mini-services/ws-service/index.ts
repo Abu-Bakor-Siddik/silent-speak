@@ -4,12 +4,10 @@ import { Server } from "socket.io";
 const PORT = Number(process.env.PORT) || 3003;
 
 const httpServer = createServer((req, res) => {
-  // Health check endpoint — keeps Render from spinning down
-  // and lets UptimeRobot ping it
-  if (req.url === "/health" || req.url === "/") {
-    res.writeHead(200, { "Content-Type": "text/plain" });
-    res.end("OK");
-  }
+  // Respond OK to any GET — Render's health checker and UptimeRobot
+  // hit the root path; returning 200 prevents the service from sleeping.
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("OK");
 });
 
 const io = new Server(httpServer, {
@@ -17,9 +15,10 @@ const io = new Server(httpServer, {
     origin: "*",
     methods: ["GET", "POST"],
   },
-  // Force websocket only — avoids Render free-tier polling issues
-  transports: ["websocket"],
-  // Increase ping timeout so Render's slow cold-starts don't drop sockets
+  // Allow both polling AND websocket — polling is needed for the initial
+  // HTTP upgrade handshake on Render's free tier. Without it, connections
+  // never establish and clients reconnect forever.
+  transports: ["polling", "websocket"],
   pingTimeout: 60000,
   pingInterval: 25000,
 });
