@@ -96,7 +96,7 @@ export function TeacherSession() {
     if (!activeSession) return
 
     const socket = io(WS_URL, {
-      transports: ['websocket'],   // skip polling — fixes Render free-tier issues
+      transports: ['polling', 'websocket'], // polling first for handshake, then upgrades to ws
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
