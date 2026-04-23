@@ -179,6 +179,12 @@ export const useAppStore = create<AppState>()(
   setActiveSession: (session) =>
     set({
       activeSession: session,
+      // Always clear session-scoped state when switching/ending sessions
+      captions: [],
+      fullCaptionText: '',
+      messages: [],
+      participants: [],
+      tasks: [],
     }),
 
     resetApp: () => {

@@ -36,6 +36,8 @@ export function StudentSession() {
   const [saving, setSaving]             = useState(false)
   const [sessionEnded, setSessionEnded] = useState(false)
   const [isConnected, setIsConnected]   = useState(false)
+  const [joinedRoom, setJoinedRoom]     = useState(false)
+  const [sessionNotFound, setSessionNotFound] = useState(false)
   const captionsEndRef = useRef<HTMLDivElement>(null)
 
   const activeSessionRef = useRef(activeSession)
@@ -69,6 +71,8 @@ export function StudentSession() {
     socket.on('connect', () => {
       console.log('[Student] connected', socket.id)
       setIsConnected(true)
+      setJoinedRoom(false)
+      setSessionNotFound(false)
       const s = activeSessionRef.current
       const u = currentUserRef.current
       if (s && u) {
@@ -83,6 +87,17 @@ export function StudentSession() {
     socket.on('disconnect', (reason) => {
       console.log('[Student] disconnected', reason)
       setIsConnected(false)
+      setJoinedRoom(false)
+    })
+
+    socket.on('joined-room', () => {
+      console.log('[Student] joined room successfully')
+      setJoinedRoom(true)
+    })
+
+    socket.on('session-error', (data: { message: string }) => {
+      console.error('[Student] session error:', data.message)
+      setSessionNotFound(true)
     })
 
     socket.on('caption', (data: { text: string; timestamp: number }) => {
@@ -138,7 +153,7 @@ export function StudentSession() {
   // ── Messages ───────────────────────────────────────────────────────────────
   const sendMessage = () => {
     const socket = socketRef.current
-    if (!messageInput.trim() || !socket?.connected || !activeSession) return
+    if (!messageInput.trim() || !socket?.connected || !joinedRoom || !activeSession) return
     const msg = {
       sessionCode: activeSession.code,
       senderId: currentUser?.id || '',
@@ -154,7 +169,7 @@ export function StudentSession() {
 
   const sendQuickComm = (phrase: string) => {
     const socket = socketRef.current
-    if (!socket?.connected || !activeSession) return
+    if (!socket?.connected || !joinedRoom || !activeSession) return
 
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel()
@@ -243,6 +258,25 @@ export function StudentSession() {
     )
   }
 
+  if (sessionNotFound) {
+    return (
+      <div className="flex items-center justify-center min-h-[70vh] px-4">
+        <Card className="max-w-md w-full text-center">
+          <CardHeader>
+            <div className="mx-auto mb-2"><AlertTriangle className="size-12 text-red-500" /></div>
+            <CardTitle className="text-xl">Session Not Found</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">The session code <strong>{activeSession?.code}</strong> was not found. The teacher may not have started the session yet.</p>
+            <Button onClick={() => { setActiveSession(null); setCurrentView('role-select') }} className="min-h-[44px]">
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   if (sessionEnded) {
     return (
       <div className="flex items-center justify-center min-h-[70vh] px-4">
@@ -296,7 +330,7 @@ export function StudentSession() {
             <div className="min-h-[200px] max-h-[400px] overflow-y-auto rounded-md border p-3 space-y-1">
               {captions.length === 0 ? (
                 <p className="text-muted-foreground text-sm">
-                  {isConnected ? 'Waiting for teacher to start captions...' : 'Connecting to session...'}
+                  {!isConnected ? 'Connecting to session...' : !joinedRoom ? 'Joining session room...' : 'Waiting for teacher to start captions...'}
                 </p>
               ) : (
                 captions.map((c, i) => (
@@ -377,7 +411,7 @@ export function StudentSession() {
                 onChange={(e) => setMessageInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
               />
-              <Button size="sm" className="min-h-[44px]" onClick={sendMessage} disabled={!isConnected}>
+              <Button size="sm" className="min-h-[44px]" onClick={sendMessage} disabled={!joinedRoom}>
                 <Send className="size-4" />
               </Button>
             </div>
